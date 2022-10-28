@@ -84,7 +84,7 @@ struct ProcessRunData
 };
 
 
-char __cdecl runCommand(ProcessRunData* gameRunData)
+char __cdecl runCommand(ProcessRunData* gameRunData, bool hook)
 {
   DWORD lastError; // eax
   DWORD dwProcessId; // edx
@@ -103,24 +103,33 @@ char __cdecl runCommand(ProcessRunData* gameRunData)
   strcat(CommandLine, gameRunData->maybeLaunchArgs);
 
 
-  char hookDllPath[MAX_PATH + 1];
-  SetLastError(0);
-  GetModuleFileNameA(nullptr, hookDllPath, MAX_PATH + 1);
-  release_assert(GetLastError() == 0);
-
-  int lastSlash = -1;
-  for (int i = 0; hookDllPath[i] != '\0'; i++)
+  BOOL runResult = FALSE;
+  if (hook)
   {
-    if (hookDllPath[i] == '\\')
-      lastSlash = i;
+    char hookDllPath[MAX_PATH + 1];
+    SetLastError(0);
+    GetModuleFileNameA(nullptr, hookDllPath, MAX_PATH + 1);
+    release_assert(GetLastError() == 0);
+
+    int lastSlash = -1;
+    for (int i = 0; hookDllPath[i] != '\0'; i++)
+    {
+      if (hookDllPath[i] == '\\')
+        lastSlash = i;
+    }
+    release_assert(lastSlash != -1);
+
+    hookDllPath[lastSlash + 1] = 0;
+    strcat(hookDllPath, "EmperorHooks.dll");
+
+    runResult = DetourCreateProcessWithDllA(0, CommandLine, 0, 0, 1, 0, 0, 0, &StartupInfo, &ProcessInformation, hookDllPath, nullptr);
   }
-  release_assert(lastSlash != -1);
+  else
+  {
+    runResult = CreateProcessA(0, CommandLine, 0, 0, 1, 0, 0, 0, &StartupInfo, &ProcessInformation);
+  }
 
-  hookDllPath[lastSlash + 1] = 0;
-  strcat(hookDllPath, "EmperorHooks.dll");
-
-
-  if (!DetourCreateProcessWithDllA(0, CommandLine, 0, 0, 1, 0, 0, 0, &StartupInfo, &ProcessInformation, hookDllPath, nullptr))
+  if (!runResult)
   {
     lastError = GetLastError();
     FormatMessageA(0x1000u, 0, lastError, 0x400u, Buffer, 0x100u, 0);
@@ -163,13 +172,20 @@ void waitForExit(ProcessRunData* gameRunData, DWORD* exitCode)
     GetExitCodeProcess(gameRunData->processHandle, exitCode);
 }
 
-int main()
+int main(int argc, char** argv)
 {
+  bool hook = true;
+  for (int i = 0; i < argc; i++)
+  {
+    if (strcmp(argv[i], "--no-hook") == 0)
+      hook = false;
+  }
+
   createGlobalCommsFileMappingHandle();
 
   ProcessRunData runGameData = {};
   strcat(runGameData.exeName, "Game.exe");
-  runCommand(&runGameData);
+  runCommand(&runGameData, hook);
 
   sendEmperorDatDataToGameProcessViaAnonymousMapping(runGameData.processHandle, runGameData.processThreadId);
 
