@@ -6,6 +6,7 @@
 #include <io.h>
 #include <fcntl.h>
 #include <intrin.h>
+#include "HookD3D7.hpp"
 
 
 int (WINAPI* TrueShowCursor)(BOOL bShow) = ShowCursor;
@@ -122,6 +123,7 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOI
     DetourUpdateThread(GetCurrentThread());
     DetourAttach(&(PVOID&)TrueShowCursor, FakeShowCursor);
     DetourAttach(&(PVOID&)EmptyFuncSometimesLog, MySometimesLogFunc);
+    HookD3D7();
     DetourTransactionCommit();
   }
 
