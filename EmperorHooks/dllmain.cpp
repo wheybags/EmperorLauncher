@@ -10,6 +10,22 @@
 
 
 int (WINAPI* TrueShowCursor)(BOOL bShow) = ShowCursor;
+VOID(WINAPI* OutputDebugStringAReal) (_In_opt_ LPCSTR lpOutputString) = OutputDebugStringA;
+VOID(WINAPI* OutputDebugStringWReal) (_In_opt_ LPCWSTR lpOutputString) = OutputDebugStringW;
+
+
+VOID WINAPI OutputDebugStringAWrap(_In_opt_ LPCSTR lpOutputString)
+{
+  printf("OutputDebugStringA: %s", lpOutputString);
+  OutputDebugStringAReal(lpOutputString);
+}
+
+VOID WINAPI OutputDebugStringWWrap(_In_opt_ LPCWSTR lpOutputString)
+{
+  wprintf(L"OutputDebugStringW: %s", lpOutputString);
+  OutputDebugStringWReal(lpOutputString);
+}
+
 
 long count = 0;
 int WINAPI FakeShowCursor(BOOL bShow)
@@ -121,6 +137,8 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOI
 
     DetourTransactionBegin();
     DetourUpdateThread(GetCurrentThread());
+    DetourAttach(&(PVOID&)OutputDebugStringAReal, OutputDebugStringAWrap);
+    DetourAttach(&(PVOID&)OutputDebugStringWReal, OutputDebugStringWWrap);
     DetourAttach(&(PVOID&)TrueShowCursor, FakeShowCursor);
     DetourAttach(&(PVOID&)EmptyFuncSometimesLog, MySometimesLogFunc);
     HookD3D7();
