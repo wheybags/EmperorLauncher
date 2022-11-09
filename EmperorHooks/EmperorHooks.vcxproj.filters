@@ -23,6 +23,9 @@
     <ClInclude Include="Error.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="PatchD3D7ResolutionLimit.hpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -32,6 +35,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="HookD3D7.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PatchD3D7ResolutionLimit.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

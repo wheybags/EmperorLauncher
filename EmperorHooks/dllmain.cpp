@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <intrin.h>
 #include "HookD3D7.hpp"
+#include "PatchD3D7ResolutionLimit.hpp"
 
 
 int (WINAPI* TrueShowCursor)(BOOL bShow) = ShowCursor;
@@ -143,6 +144,8 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOI
     DetourAttach(&(PVOID&)EmptyFuncSometimesLog, MySometimesLogFunc);
     HookD3D7();
     DetourTransactionCommit();
+
+    patchD3D7ResolutionLimit();
   }
 
   return TRUE;
