@@ -6,6 +6,7 @@
 #include <io.h>
 #include <fcntl.h>
 #include <intrin.h>
+#include <thread>
 #include "HookD3D7.hpp"
 #include "PatchD3D7ResolutionLimit.hpp"
 
@@ -124,6 +125,11 @@ void (*EmptyFuncSometimesLog)(...) = (void (*)(...))0x401CB0;
 
 bool isBorderlessWindowed = true;
 
+volatile HWND backgroundWindowHandle = nullptr;
+volatile DWORD backgroundWindowThreadId = 0;
+volatile bool focus = true;
+
+
 HWND* const mainWindowHandleP = (HWND*)0x007D75A8;
 uint8_t* gDoQuitP = (uint8_t*)0x007D75AC;
 
@@ -153,7 +159,12 @@ BOOL __cdecl setWindowStyleAndDrainMessages(HWND hWnd, int width, int height, ch
   SetWindowLongA(hWnd, GWL_STYLE, style);
   if (isBorderlessWindowed)
   {
-    SetWindowPos(hWnd, HWND_TOPMOST, GetSystemMetrics(SM_CXSCREEN) / 2 - useWidth / 2, 0, useWidth, useHeight, SWP_SHOWWINDOW);
+    int left = GetSystemMetrics(SM_CXSCREEN) / 2 - useWidth / 2;
+    SetWindowPos(hWnd, HWND_TOPMOST, left, 0, useWidth, useHeight, SWP_SHOWWINDOW);
+
+    RECT rc = {};
+    GetWindowRect(*mainWindowHandleP, &rc);
+    ClipCursor(&rc);
   }
   else
   {
@@ -181,16 +192,14 @@ typedef int(__stdcall* WndProcDuneIIIType)(HWND hWnd, UINT Msg, WPARAM wParam, L
 WndProcDuneIIIType wndProcDuneIIIOriginal = (WndProcDuneIIIType)0x004A6560;
 
 
-bool focus = true;
-uint64_t lastFocusCheckTick = 0;
-
 int __stdcall wndProcDuneIII(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
 {
   int ret = wndProcDuneIIIOriginal(hWnd, Msg, wParam, lParam);
 
+
   if (hWnd == *mainWindowHandleP && Msg == WM_ACTIVATEAPP)
   {
-    if (wParam)
+    if (wParam || (!wParam && lParam == backgroundWindowThreadId))
     {
       printf("GAINED FOCUS\n");
       focus = true;
@@ -200,19 +209,92 @@ int __stdcall wndProcDuneIII(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
       printf("LOST FOCUS\n");
       focus = false;
       SetWindowPos(hWnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
+      ShowWindow(hWnd, SW_MINIMIZE);
+
+      SetWindowPos(backgroundWindowHandle, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
+      ShowWindow(backgroundWindowHandle, SW_MINIMIZE);
     }
   }
 
-  // We do this repeatedly because if we just do it once the taskbar sometimes stays on top. Not sure why, but this fixes it.
-  if (GetTickCount64() - lastFocusCheckTick >= 1000 * 5)
-  {
-    lastFocusCheckTick = GetTickCount64();
+  static bool hadFocus = true;
 
-    if (focus && *mainWindowHandleP && *mainWindowHandleP != INVALID_HANDLE_VALUE)
+  if (focus && !hadFocus)
+  {
+    RECT rc = {};
+    GetWindowRect(*mainWindowHandleP, &rc);
+    ClipCursor(&rc);
+
+    std::thread([]()
+    {
+      printf("%p %p\n", *mainWindowHandleP, backgroundWindowHandle);
+      Sleep(1000 * 2);
+      ShowWindow(backgroundWindowHandle, SW_SHOWNOACTIVATE);
+      Sleep(1000 * 2);
+      SetWindowPos(backgroundWindowHandle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
+      Sleep(1000 * 2);
       SetWindowPos(*mainWindowHandleP, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_SHOWWINDOW);
+      ShowWindow(*mainWindowHandleP, SW_SHOW);
+    }).detach();
   }
 
+  hadFocus = focus;
+
   return ret;
+}
+
+
+
+void backgroundWindow()
+{
+  backgroundWindowThreadId = GetCurrentThreadId();
+
+  // Register the window class.
+  const char CLASS_NAME[] = "DuneIII background";
+
+  WNDCLASSA wc = { };
+  wc.lpfnWndProc = DefWindowProcA;
+  wc.hInstance = GetModuleHandleA(nullptr);
+  wc.lpszClassName = CLASS_NAME;
+  RegisterClassA(&wc);
+
+  HWND temp = CreateWindowExA(
+    WS_EX_TOOLWINDOW,                              // Optional window styles.
+    CLASS_NAME,                     // Window class
+    nullptr,    // Window text
+    WS_POPUP,            // Window style
+
+    // Size and position
+    CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
+
+    NULL,       // Parent window    
+    NULL,       // Menu
+    wc.hInstance,  // Instance handle
+    NULL        // Additional application data
+  );
+
+  ShowWindow(temp, SW_MAXIMIZE);
+
+  HBRUSH black = CreateSolidBrush(RGB(0, 0, 0));
+  SetClassLongPtrA(temp, GCLP_HBRBACKGROUND, (LONG_PTR)black);
+  InvalidateRect(temp, nullptr, 1);
+
+  backgroundWindowHandle = temp;
+
+  BOOL bRet;
+
+  MSG msg;
+  while ((bRet = GetMessage(&msg, backgroundWindowHandle, 0, 0)) != 0)
+  {
+    if (bRet == -1)
+    {
+      break;
+    }
+    else
+    {
+      TranslateMessage(&msg);
+      DispatchMessage(&msg);
+    }
+  }
 }
 
 
@@ -241,6 +323,18 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOI
     DetourTransactionCommit();
 
     patchD3D7ResolutionLimit();
+
+    std::thread([]() { backgroundWindow(); }).detach();
+    std::thread([]()
+    {
+      while (true)
+      {
+        Sleep(1000 * 1);
+        RECT rect;
+        if (GetWindowRect(*mainWindowHandleP, &rect))
+          ClipCursor(&rect);
+      }
+    }).detach();
   }
 
   return TRUE;
