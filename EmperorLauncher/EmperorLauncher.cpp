@@ -1,5 +1,7 @@
 #include <Windows.h>
 #include <detours.h>
+#include <cstdio>
+#include <string>
 
 #define release_assert(X) if (!(X)) abort()
 
@@ -172,8 +174,66 @@ void waitForExit(ProcessRunData* gameRunData, DWORD* exitCode)
     GetExitCodeProcess(gameRunData->processHandle, exitCode);
 }
 
+
+void writeGraphicsSettings(int screenWidth, int screenHeight)
+{
+  HKEY key = nullptr;
+  HRESULT result = RegCreateKeyExA(HKEY_LOCAL_MACHINE, "SOFTWARE\\Westwood\\Emperor\\Options\\Graphics", 0, nullptr, 0, KEY_WRITE, nullptr, &key, nullptr);
+  if (result != S_OK)
+    result = RegCreateKeyExA(HKEY_CURRENT_USER, "SOFTWARE\\Classes\\VirtualStore\\MACHINE\\SOFTWARE\\WOW6432Node\\Westwood\\Emperor\\Options\\Graphics", 0, nullptr, 0, KEY_WRITE, nullptr, &key, nullptr);
+  release_assert(result == S_OK && key);
+
+  auto setValue = [&](const char* valueName, const std::string& value)
+  {
+    release_assert(RegSetKeyValueA(key, nullptr, valueName, REG_SZ, value.c_str(), DWORD(value.size() + 1)) == ERROR_SUCCESS);
+  };
+
+  setValue("ScreenWidth", std::to_string(screenWidth));
+  setValue("ScreenHeight", std::to_string(screenHeight));
+
+  // Just copied from the registry after cranking all settings in the in game settings dialogue
+  setValue("GraphicsLOD", "4");
+  setValue("ColorDepth", "32");
+  setValue("Shadows", "1");
+  setValue("ModelLOD", "2");
+  setValue("TextureLOD", "0");
+  setValue("TerrainLOD", "2");
+  setValue("EffectLOD", "2");
+  setValue("MultiTexture", "1");
+  setValue("HardwareTL", "1");
+  setValue("AltDevice", "0");
+  setValue("ShadowQuality", "2");
+  setValue("LimitFrameRate", "0");
+  setValue("LimitTo16BitTex", "0");
+
+  RegCloseKey(key);
+}
+
+void getMainMonitorDimensions(int& screenWidth, int& screenHeight)
+{
+  const POINT ptZero = { 0, 0 };
+  HMONITOR monitor = MonitorFromPoint(ptZero, MONITOR_DEFAULTTOPRIMARY);
+  MONITORINFO info;
+  info.cbSize = sizeof(MONITORINFO);
+  GetMonitorInfo(monitor, &info);
+  screenWidth = info.rcMonitor.right - info.rcMonitor.left;
+  screenHeight = info.rcMonitor.bottom - info.rcMonitor.top;
+}
+
+
 int main(int argc, char** argv)
 {
+  SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
+
+  int screenWidth = 0;
+  int screenHeight = 0;
+  getMainMonitorDimensions(screenWidth, screenHeight);
+
+  // Lots of stuff in the game assumes a 4:3 screen ratio - I tried to patch this out but I couldn't figure it out for now :(
+  int adjustedScreenWidth = int(float(screenHeight) * 4.0f / 3.0f);
+
+  writeGraphicsSettings(adjustedScreenWidth, screenHeight);
+
   bool hook = true;
   for (int i = 0; i < argc; i++)
   {
@@ -185,6 +245,7 @@ int main(int argc, char** argv)
 
   ProcessRunData runGameData = {};
   strcat(runGameData.exeName, "Game.exe");
+  strcat(runGameData.maybeLaunchArgs, " -w"); // we need windowed mode - higher resolutions don't work in fullscreen
   runCommand(&runGameData, hook);
 
   sendEmperorDatDataToGameProcessViaAnonymousMapping(runGameData.processHandle, runGameData.processThreadId);

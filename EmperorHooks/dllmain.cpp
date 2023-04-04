@@ -122,6 +122,99 @@ void setupConsole()
 
 void (*EmptyFuncSometimesLog)(...) = (void (*)(...))0x401CB0;
 
+bool isBorderlessWindowed = true;
+
+HWND* const mainWindowHandleP = (HWND*)0x007D75A8;
+uint8_t* gDoQuitP = (uint8_t*)0x007D75AC;
+
+typedef BOOL(__cdecl* SetWindowStyleAndDrainMessagesFuncType)(HWND hWnd, int width, int height, char windowedMode);
+SetWindowStyleAndDrainMessagesFuncType setWindowStyleAndDrainMessagesOriginal = (SetWindowStyleAndDrainMessagesFuncType)0x004A7260;
+BOOL __cdecl setWindowStyleAndDrainMessages(HWND hWnd, int width, int height, char windowedMode)
+{
+  DWORD style; // ebp
+  int useWidth; // esi
+  int useHeight; // ebx
+  BOOL hasWindow; // esi
+  DWORD extendedStyle; // eax
+  BOOL result; // eax
+  struct tagRECT rc; // [esp+10h] [ebp-2Ch] BYREF
+  struct tagMSG Msg; // [esp+20h] [ebp-1Ch] BYREF
+
+  style = WS_POPUP;
+  useWidth = GetSystemMetrics(SM_CXSCREEN);
+  useHeight = GetSystemMetrics(SM_CYSCREEN);
+  if (windowedMode)
+  {
+    useWidth = width;
+    useHeight = height;
+    if (!isBorderlessWindowed)
+      style = WS_POPUPWINDOW | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_DLGFRAME;
+  }
+  SetWindowLongA(hWnd, GWL_STYLE, style);
+  if (isBorderlessWindowed)
+  {
+    SetWindowPos(hWnd, HWND_TOPMOST, GetSystemMetrics(SM_CXSCREEN) / 2 - useWidth / 2, 0, useWidth, useHeight, SWP_SHOWWINDOW);
+  }
+  else
+  {
+    SetRect(&rc, 0, 0, useWidth, useHeight);
+    hasWindow = GetMenu(hWnd) != 0;
+    extendedStyle = GetWindowLongA(hWnd, GWL_EXSTYLE);
+    AdjustWindowRectEx(&rc, style, hasWindow, extendedStyle);
+    MoveWindow(hWnd, 0, 0, rc.right - rc.left, rc.bottom - rc.top, 0);
+    ShowWindow(hWnd, SW_SHOW);
+    InvalidateRect(hWnd, 0, 0);
+  }
+  
+  for (result = PeekMessageA(&Msg, 0, 0, 0, 0); result; result = PeekMessageA(&Msg, 0, 0, 0, 0))
+  {
+    GetMessageA(&Msg, 0, 0, 0);
+    if (Msg.message == WM_QUIT && (Msg.hwnd == *mainWindowHandleP || (HWND)Msg.wParam == *mainWindowHandleP))
+      *gDoQuitP = 1;
+    TranslateMessage(&Msg);
+    DispatchMessageA(&Msg);
+  }
+  return result;
+}
+
+typedef int(__stdcall* WndProcDuneIIIType)(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam);
+WndProcDuneIIIType wndProcDuneIIIOriginal = (WndProcDuneIIIType)0x004A6560;
+
+
+bool focus = true;
+uint64_t lastFocusCheckTick = 0;
+
+int __stdcall wndProcDuneIII(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
+{
+  int ret = wndProcDuneIIIOriginal(hWnd, Msg, wParam, lParam);
+
+  if (hWnd == *mainWindowHandleP && Msg == WM_ACTIVATEAPP)
+  {
+    if (wParam)
+    {
+      printf("GAINED FOCUS\n");
+      focus = true;
+    }
+    else
+    {
+      printf("LOST FOCUS\n");
+      focus = false;
+      SetWindowPos(hWnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
+    }
+  }
+
+  // We do this repeatedly because if we just do it once the taskbar sometimes stays on top. Not sure why, but this fixes it.
+  if (GetTickCount64() - lastFocusCheckTick >= 1000 * 5)
+  {
+    lastFocusCheckTick = GetTickCount64();
+
+    if (focus && *mainWindowHandleP && *mainWindowHandleP != INVALID_HANDLE_VALUE)
+      SetWindowPos(*mainWindowHandleP, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_SHOWWINDOW);
+  }
+
+  return ret;
+}
+
 
 __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOID reserved)
 {
@@ -142,6 +235,8 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOI
     DetourAttach(&(PVOID&)OutputDebugStringWReal, OutputDebugStringWWrap);
     DetourAttach(&(PVOID&)TrueShowCursor, FakeShowCursor);
     DetourAttach(&(PVOID&)EmptyFuncSometimesLog, MySometimesLogFunc);
+    DetourAttach(&(PVOID&)setWindowStyleAndDrainMessagesOriginal, setWindowStyleAndDrainMessages);
+    DetourAttach(&(PVOID&)wndProcDuneIIIOriginal, wndProcDuneIII);
     HookD3D7();
     DetourTransactionCommit();
 
