@@ -99,13 +99,17 @@ nmake</Command>
   <ItemGroup>
     <ClInclude Include="Error.hpp" />
     <ClInclude Include="framework.h" />
+    <ClInclude Include="GameExeImports.hpp" />
     <ClInclude Include="HookD3D7.hpp" />
+    <ClInclude Include="DoCdCheck.hpp" />
     <ClInclude Include="PatchD3D7ResolutionLimit.hpp" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="GameExeImports.cpp" />
     <ClCompile Include="HookD3D7.cpp" />
+    <ClCompile Include="DoCdCheck.cpp" />
     <ClCompile Include="PatchD3D7ResolutionLimit.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>

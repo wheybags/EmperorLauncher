@@ -26,6 +26,12 @@
     <ClInclude Include="PatchD3D7ResolutionLimit.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="GameExeImports.hpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DoCdCheck.hpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -38,6 +44,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="PatchD3D7ResolutionLimit.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DoCdCheck.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GameExeImports.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

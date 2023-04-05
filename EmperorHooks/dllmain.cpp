@@ -9,6 +9,8 @@
 #include <thread>
 #include "HookD3D7.hpp"
 #include "PatchD3D7ResolutionLimit.hpp"
+#include "GameExeImports.hpp"
+#include "DoCdCheck.hpp"
 
 
 int (WINAPI* TrueShowCursor)(BOOL bShow) = ShowCursor;
@@ -121,17 +123,12 @@ void setupConsole()
   }
 }
 
-void (*EmptyFuncSometimesLog)(...) = (void (*)(...))0x401CB0;
-
 bool isBorderlessWindowed = true;
 
 volatile HWND backgroundWindowHandle = nullptr;
 volatile DWORD backgroundWindowThreadId = 0;
 volatile bool focus = true;
 
-
-HWND* const mainWindowHandleP = (HWND*)0x007D75A8;
-uint8_t* gDoQuitP = (uint8_t*)0x007D75AC;
 
 typedef BOOL(__cdecl* SetWindowStyleAndDrainMessagesFuncType)(HWND hWnd, int width, int height, char windowedMode);
 SetWindowStyleAndDrainMessagesFuncType setWindowStyleAndDrainMessagesOriginal = (SetWindowStyleAndDrainMessagesFuncType)0x004A7260;
@@ -319,6 +316,7 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOI
     DetourAttach(&(PVOID&)EmptyFuncSometimesLog, MySometimesLogFunc);
     DetourAttach(&(PVOID&)setWindowStyleAndDrainMessagesOriginal, setWindowStyleAndDrainMessages);
     DetourAttach(&(PVOID&)wndProcDuneIIIOriginal, wndProcDuneIII);
+    DetourAttach(&(PVOID&)doCdCheck, doCdCheckPatched);
     HookD3D7();
     DetourTransactionCommit();
 
