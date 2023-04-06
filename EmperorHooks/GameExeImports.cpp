@@ -14,4 +14,5 @@ DWORD* dword_B7D098P = (DWORD*)0xB7D098;
 int** resourceManagerP = (int**)0x007D75B8;
 HWND* const mainWindowHandleP = (HWND*)0x007D75A8;
 uint8_t* gDoQuitP = (uint8_t*)0x007D75AC;
-char** cd1DriveLetterPathP = (char**)0x007CBC50;
+char** currentCdDataPathP = (char**)0x007CBC50;
+int* somethingThatControlsExitingCdCheckLoopP = (int*)0x007CBC68;

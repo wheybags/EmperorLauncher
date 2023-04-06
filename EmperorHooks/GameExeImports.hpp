@@ -15,4 +15,5 @@ extern DWORD* dword_B7D098P;
 extern int** resourceManagerP;
 extern HWND* const mainWindowHandleP;
 extern uint8_t* gDoQuitP;
-extern char** cd1DriveLetterPathP;
+extern char** currentCdDataPathP;
+extern int* somethingThatControlsExitingCdCheckLoopP;
