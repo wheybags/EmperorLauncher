@@ -129,6 +129,12 @@ volatile HWND backgroundWindowHandle = nullptr;
 volatile DWORD backgroundWindowThreadId = 0;
 volatile bool focus = true;
 
+void myClipCursor(const RECT* rect)
+{
+  if (!IsDebuggerPresent())
+    ClipCursor(rect);
+}
+
 
 typedef BOOL(__cdecl* SetWindowStyleAndDrainMessagesFuncType)(HWND hWnd, int width, int height, char windowedMode);
 SetWindowStyleAndDrainMessagesFuncType setWindowStyleAndDrainMessagesOriginal = (SetWindowStyleAndDrainMessagesFuncType)0x004A7260;
@@ -161,7 +167,7 @@ BOOL __cdecl setWindowStyleAndDrainMessages(HWND hWnd, int width, int height, ch
 
     RECT rc = {};
     GetWindowRect(*mainWindowHandleP, &rc);
-    ClipCursor(&rc);
+    myClipCursor(&rc);
   }
   else
   {
@@ -219,7 +225,7 @@ int __stdcall wndProcDuneIII(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
   {
     RECT rc = {};
     GetWindowRect(*mainWindowHandleP, &rc);
-    ClipCursor(&rc);
+    myClipCursor(&rc);
 
     std::thread([]()
     {
@@ -330,7 +336,7 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOI
         Sleep(1000 * 1);
         RECT rect;
         if (GetWindowRect(*mainWindowHandleP, &rect))
-          ClipCursor(&rect);
+          myClipCursor(&rect);
       }
     }).detach();
   }
