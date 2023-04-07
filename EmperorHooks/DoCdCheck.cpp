@@ -44,7 +44,7 @@ char __cdecl doCdCheckPatched(int cdIndex, char a2)
   {
     int maxIterations = a2 != 0 ? 9 : 0;
 
-    for (int i = 0; i < maxIterations; i++)
+    for (int i = 0; i <= maxIterations; i++)
     {
       int someCdDataObj = 0;
       switch (cdIndex - 1)
