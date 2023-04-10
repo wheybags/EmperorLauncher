@@ -63,7 +63,7 @@ char __cdecl doCdCheckPatched(int cdIndex, char a2)
         LABEL_27:
           break;
         default:
-          EmptyFuncSometimesLog("Invalid CD Check ID");
+          printf("Invalid CD Check ID");
           break;
       }
 
@@ -98,7 +98,7 @@ char __cdecl doCdCheckPatched(int cdIndex, char a2)
       // if we are using a CD, make sure we have the right one
       if (isPathADiskRoot(driveLetterPath))
       {
-        EmptyFuncSometimesLog("Volume %s is a CD-ROM Drive\n", driveLetterPath);
+        printf("Volume %s is a CD-ROM Drive\n", driveLetterPath);
 
         CHAR VolumeNameBuffer[512];
         if (GetVolumeInformationA(driveLetterPath, VolumeNameBuffer, sizeof(VolumeNameBuffer) - 1, 0, 0, 0, 0, 0))
