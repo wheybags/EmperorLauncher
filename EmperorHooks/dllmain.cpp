@@ -12,6 +12,7 @@
 #include "GameExeImports.hpp"
 #include "DoCdCheck.hpp"
 #include "PatchDebugLog.hpp"
+#include "PatchSettings.hpp"
 
 
 int (WINAPI* TrueShowCursor)(BOOL bShow) = ShowCursor;
@@ -230,7 +231,6 @@ void backgroundWindow()
   }
 }
 
-
 __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOID reserved)
 {
   if (DetourIsHelperProcess()) {
@@ -240,6 +240,8 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOI
   if (dwReason == DLL_PROCESS_ATTACH) 
   {
     DetourRestoreAfterWith();
+
+    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
 
     MessageBoxA(nullptr, "AAA", "AAA", 0);
     setupConsole();
@@ -251,7 +253,8 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOI
     DetourAttach(&(PVOID&)TrueShowCursor, FakeShowCursor);
     DetourAttach(&(PVOID&)setWindowStyleAndDrainMessagesOriginal, setWindowStyleAndDrainMessages);
     DetourAttach(&(PVOID&)wndProcDuneIIIOriginal, wndProcDuneIII);
-    DetourAttach(&(PVOID&)doCdCheck, doCdCheckPatched);
+    DetourAttach(&(PVOID&)doCdCheckOrig, doCdCheckPatched);
+    DetourAttach(&(PVOID&)regSettingsOpenHkeyOrig, regSettingsOpenHkeyPatched);
     HookD3D7();
     patchDebugLog();
     DetourTransactionCommit();

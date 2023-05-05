@@ -3,7 +3,7 @@
 #include <cstdio>
 #include <string>
 
-#define release_assert(X) if (!(X)) abort()
+#define release_assert(X) do { if (!(X)) { DebugBreak(); abort();} } while(false)
 
 
 HANDLE globalCommsFileMappingHandle = nullptr;
@@ -108,23 +108,19 @@ char __cdecl runCommand(ProcessRunData* gameRunData, bool hook)
   BOOL runResult = FALSE;
   if (hook)
   {
-    char hookDllPath[MAX_PATH + 1];
-    SetLastError(0);
-    GetModuleFileNameA(nullptr, hookDllPath, MAX_PATH + 1);
-    release_assert(GetLastError() == 0);
-
-    int lastSlash = -1;
-    for (int i = 0; hookDllPath[i] != '\0'; i++)
+    std::string hookDllPath;
     {
-      if (hookDllPath[i] == '\\')
-        lastSlash = i;
+      char temp[MAX_PATH + 1];
+      SetLastError(0);
+      GetModuleFileNameA(nullptr, temp, MAX_PATH + 1);
+      release_assert(GetLastError() == 0);
+
+      hookDllPath = temp;
+      hookDllPath.resize(hookDllPath.size() - (sizeof("EmperorLauncher.exe") - 1));
+      hookDllPath += "EmperorHooks.dll";
     }
-    release_assert(lastSlash != -1);
 
-    hookDllPath[lastSlash + 1] = 0;
-    strcat(hookDllPath, "EmperorHooks.dll");
-
-    runResult = DetourCreateProcessWithDllA(0, CommandLine, 0, 0, 1, 0, 0, 0, &StartupInfo, &ProcessInformation, hookDllPath, nullptr);
+    runResult = DetourCreateProcessWithDllA(0, CommandLine, 0, 0, 1, 0, 0, 0, &StartupInfo, &ProcessInformation, hookDllPath.c_str(), nullptr);
   }
   else
   {
@@ -178,9 +174,7 @@ void waitForExit(ProcessRunData* gameRunData, DWORD* exitCode)
 void writeGraphicsSettings(int screenWidth, int screenHeight)
 {
   HKEY key = nullptr;
-  HRESULT result = RegCreateKeyExA(HKEY_LOCAL_MACHINE, "SOFTWARE\\Westwood\\Emperor\\Options\\Graphics", 0, nullptr, 0, KEY_WRITE, nullptr, &key, nullptr);
-  if (result != S_OK)
-    result = RegCreateKeyExA(HKEY_CURRENT_USER, "SOFTWARE\\Classes\\VirtualStore\\MACHINE\\SOFTWARE\\WOW6432Node\\Westwood\\Emperor\\Options\\Graphics", 0, nullptr, 0, KEY_WRITE, nullptr, &key, nullptr);
+  HRESULT result = RegCreateKeyExA(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\Options\\Graphics", 0, nullptr, 0, KEY_WRITE, nullptr, &key, nullptr);
   release_assert(result == S_OK && key);
 
   auto setValue = [&](const char* valueName, const std::string& value)

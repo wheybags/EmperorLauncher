@@ -83,7 +83,7 @@ char __cdecl doCdCheckPatched(int cdIndex, char a2)
         case 8:
           cdResourceName = "CD4";
         LABEL_14:
-          driveLetterPath = ResourceManager_GetResourceString(*resourceManagerP, cdResourceName);
+          driveLetterPath = ResourceManager_GetResourceStringOrig(*resourceManagerP, cdResourceName);
           break;
         default:
           driveLetterPath = nullptr;
@@ -125,19 +125,19 @@ char __cdecl doCdCheckPatched(int cdIndex, char a2)
         switch (cdIndex - 1)
         {
           case 0:
-            setupSoundCdPaths(driveLetterPath, 1);
+            setupSoundCdPathsOrig(driveLetterPath, 1);
             return 1;
           case 1:
-            setupSoundCdPaths(driveLetterPath, 2);
+            setupSoundCdPathsOrig(driveLetterPath, 2);
             return 1;
           case 3:
-            setupSoundCdPaths(driveLetterPath, 3);
+            setupSoundCdPathsOrig(driveLetterPath, 3);
             return 1;
           case 7:
-            setupSoundCdPaths(driveLetterPath, 4);
+            setupSoundCdPathsOrig(driveLetterPath, 4);
             return 1;
           default:
-            setupSoundCdPaths(driveLetterPath, 0);
+            setupSoundCdPathsOrig(driveLetterPath, 0);
             return 1;
         }
       }
@@ -217,7 +217,7 @@ char __cdecl doCdCheckPatched(int cdIndex, char a2)
 
       if (ok)
       {
-        setupSoundCdPaths(*currentCdDataPathP, 0);
+        setupSoundCdPathsOrig(*currentCdDataPathP, 0);
         return 1;
       }
 
