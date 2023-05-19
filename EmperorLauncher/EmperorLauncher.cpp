@@ -203,25 +203,21 @@ void writeGraphicsSettings(int screenWidth, int screenHeight)
   RegCloseKey(key);
 }
 
-void getMainMonitorDimensions(int& screenWidth, int& screenHeight)
+int getMainMonitorHeight()
 {
   const POINT ptZero = { 0, 0 };
   HMONITOR monitor = MonitorFromPoint(ptZero, MONITOR_DEFAULTTOPRIMARY);
   MONITORINFO info;
   info.cbSize = sizeof(MONITORINFO);
   GetMonitorInfo(monitor, &info);
-  screenWidth = info.rcMonitor.right - info.rcMonitor.left;
-  screenHeight = info.rcMonitor.bottom - info.rcMonitor.top;
+  return info.rcMonitor.bottom - info.rcMonitor.top;
 }
-
 
 int main(int argc, char** argv)
 {
   SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
 
-  int screenWidth = 0;
-  int screenHeight = 0;
-  getMainMonitorDimensions(screenWidth, screenHeight);
+  int screenHeight = getMainMonitorHeight();
 
   // Lots of stuff in the game assumes a 4:3 screen ratio - I tried to patch this out but I couldn't figure it out for now :(
   int adjustedScreenWidth = int(float(screenHeight) * 4.0f / 3.0f);

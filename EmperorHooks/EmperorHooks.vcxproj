@@ -65,7 +65,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>$(SolutionDir)Detours-4.0.1\lib.X86\detours.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(SolutionDir)Detours-4.0.1\lib.X86\detours.lib;winmm.lib;Ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PreBuildEvent>
       <Command>cd $(SolutionDir)Detours-4.0.1
@@ -91,7 +91,7 @@ nmake</Command>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>$(SolutionDir)Detours-4.0.1\lib.X86\detours.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(SolutionDir)Detours-4.0.1\lib.X86\detours.lib;winmm.lib;Ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PreBuildEvent>
       <Command>cd $(SolutionDir)Detours-4.0.1
@@ -106,6 +106,7 @@ nmake</Command>
     <ClInclude Include="DoCdCheck.hpp" />
     <ClInclude Include="PatchD3D7ResolutionLimit.hpp" />
     <ClInclude Include="PatchDebugLog.hpp" />
+    <ClInclude Include="PatchLan.hpp" />
     <ClInclude Include="PatchSettings.hpp" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
@@ -116,6 +117,7 @@ nmake</Command>
     <ClCompile Include="DoCdCheck.cpp" />
     <ClCompile Include="PatchD3D7ResolutionLimit.cpp" />
     <ClCompile Include="PatchDebugLog.cpp" />
+    <ClCompile Include="PatchLan.cpp" />
     <ClCompile Include="PatchSettings.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>

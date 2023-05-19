@@ -8,6 +8,7 @@ char* (__thiscall* ResourceManager_GetResourceStringOrig)(int* resourceManager, 
 size_t(__cdecl* setupSoundCdPathsOrig)(const char* driveLetterPath, int cdIndex) = (size_t(__cdecl*)(const char* driveLetterPath, int cdIndex))0x00477220;
 char(__cdecl* doCdCheckOrig)(int cdIndex, char a2) = (char(__cdecl*)(int cdIndex, char a2))0x00496580;
 char(__cdecl* regSettingsOpenHkeyOrig)(char* fullPath, int createKey) = (char(__cdecl*)(char* fullPath, int createKey))0x0051E0E0;
+int(__thiscall* SomeNetworkManager_SendLobbyMessageOrig)(SomeNetworkManager* This, __int16 a2, int a3, wchar_t* message, char a5) = (int(__thiscall *)(SomeNetworkManager * This, __int16 a2, int a3, wchar_t* message, char a5))0x004D96A0;
 
 DWORD* dword_B7D098P = (DWORD*)0xB7D098;
 

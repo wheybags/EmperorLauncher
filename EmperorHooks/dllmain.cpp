@@ -13,6 +13,7 @@
 #include "DoCdCheck.hpp"
 #include "PatchDebugLog.hpp"
 #include "PatchSettings.hpp"
+#include "PatchLan.hpp"
 
 
 int (WINAPI* TrueShowCursor)(BOOL bShow) = ShowCursor;
@@ -257,6 +258,7 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOI
     DetourAttach(&(PVOID&)regSettingsOpenHkeyOrig, regSettingsOpenHkeyPatched);
     HookD3D7();
     patchDebugLog();
+    patchLan();
     DetourTransactionCommit();
 
     patchD3D7ResolutionLimit();
