@@ -204,15 +204,57 @@ int __fastcall SomeNetworkManager_SendLobbyMessageWrap(SomeNetworkManager * This
   std::wstring commandReply;
 
   std::wstring_view message(message_);
-  if (message == L"/connect")
+  if (message.starts_with(L"/connect"))
   {
     connectionType = ConnectionType::Client;
     connectionsMapping.clear();
-    commandReply = L"connecting!";
 
-    serverAddress.sin_family = AF_INET;
-    serverAddress.sin_addr.S_un.S_addr = inet_addr("86.246.78.252");
-    serverAddress.sin_port = htons(4927);
+    std::wstring_view target;
+    {
+      const wchar_t* curr = message_ + 8;
+      while (*curr == L' ')
+        curr++;
+      target = curr;
+    }
+
+    std::string targetUtf8;
+    if (!target.empty())
+    {
+      int sizeNeeded = WideCharToMultiByte(CP_UTF8, 0, target.data(), int(target.length()), nullptr, 0, nullptr, nullptr);
+
+      targetUtf8.resize(sizeNeeded);
+      WideCharToMultiByte(CP_UTF8, 0, target.data(), int(target.length()), &targetUtf8[0], sizeNeeded, nullptr, nullptr);
+    }
+
+    in_addr targetAddress;
+    targetAddress.S_un.S_addr = INADDR_NONE;
+
+    if (isalpha(targetUtf8[0]))
+    {
+      hostent* remoteHost = gethostbyname(targetUtf8.c_str());
+      if (remoteHost && remoteHost->h_addrtype == AF_INET)
+        targetAddress.S_un.S_addr = *(u_long*)remoteHost->h_addr_list[0];
+    }
+    else
+    {
+      targetAddress.S_un.S_addr = inet_addr(targetUtf8.c_str());
+    }
+
+    if (targetAddress.S_un.S_addr != INADDR_NONE)
+    {
+      commandReply = L"connecting! target '" + std::wstring(target) + L"' (" + std::to_wstring(targetAddress.S_un.S_un_b.s_b1) + L"." +
+                                                                               std::to_wstring(targetAddress.S_un.S_un_b.s_b2) + L"." +
+                                                                               std::to_wstring(targetAddress.S_un.S_un_b.s_b3) + L"." + 
+                                                                               std::to_wstring(targetAddress.S_un.S_un_b.s_b4) + L")";
+
+      serverAddress.sin_family = AF_INET;
+      serverAddress.sin_addr.S_un.S_addr = targetAddress.S_un.S_addr;
+      serverAddress.sin_port = htons(4927);
+    }
+    else
+    {
+      commandReply = L"failed! could not resolve '" + std::wstring(target) + L"'";
+    }
   }
   else if (message == L"/disconnect")
   {
