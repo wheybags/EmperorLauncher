@@ -240,20 +240,29 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOI
 
   if (dwReason == DLL_PROCESS_ATTACH) 
   {
+    MessageBoxA(nullptr, "AAA", "AAA", 0);
+
+
+    DWORD doFullscreen = 1;
+    DWORD size = sizeof(DWORD);
+    HRESULT result = RegGetValueA(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\LauncherCustomSettings", "DoFullscreen", RRF_RT_REG_DWORD, nullptr, &doFullscreen, &size);
+
     DetourRestoreAfterWith();
 
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
 
-    MessageBoxA(nullptr, "AAA", "AAA", 0);
     setupConsole();
 
     DetourTransactionBegin();
     DetourUpdateThread(GetCurrentThread());
     DetourAttach(&(PVOID&)OutputDebugStringAReal, OutputDebugStringAWrap);
     DetourAttach(&(PVOID&)OutputDebugStringWReal, OutputDebugStringWWrap);
-    DetourAttach(&(PVOID&)TrueShowCursor, FakeShowCursor);
-    DetourAttach(&(PVOID&)setWindowStyleAndDrainMessagesOriginal, setWindowStyleAndDrainMessages);
-    DetourAttach(&(PVOID&)wndProcDuneIIIOriginal, wndProcDuneIII);
+    //DetourAttach(&(PVOID&)TrueShowCursor, FakeShowCursor);
+    if (doFullscreen)
+    {
+      DetourAttach(&(PVOID&)setWindowStyleAndDrainMessagesOriginal, setWindowStyleAndDrainMessages);
+      DetourAttach(&(PVOID&)wndProcDuneIIIOriginal, wndProcDuneIII);
+    }
     DetourAttach(&(PVOID&)doCdCheckOrig, doCdCheckPatched);
     DetourAttach(&(PVOID&)regSettingsOpenHkeyOrig, regSettingsOpenHkeyPatched);
     HookD3D7();
@@ -263,17 +272,20 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOI
 
     patchD3D7ResolutionLimit();
 
-    std::thread([]() { backgroundWindow(); }).detach();
-    std::thread([]()
+    if (doFullscreen)
     {
-      while (true)
+      std::thread([]() { backgroundWindow(); }).detach();
+      std::thread([]()
       {
-        Sleep(1000 * 1);
-        RECT rect;
-        if (GetWindowRect(*mainWindowHandleP, &rect))
-          myClipCursor(&rect);
-      }
-    }).detach();
+        while (true)
+        {
+          Sleep(1000 * 1);
+          RECT rect;
+          if (GetWindowRect(*mainWindowHandleP, &rect))
+            myClipCursor(&rect);
+        }
+      }).detach();
+    }
   }
 
   return TRUE;

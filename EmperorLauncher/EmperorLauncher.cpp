@@ -197,7 +197,7 @@ void writeGraphicsSettings(int screenWidth, int screenHeight)
   setValue("HardwareTL", "1");
   setValue("AltDevice", "0");
   setValue("ShadowQuality", "2");
-  setValue("LimitFrameRate", "0");
+  setValue("LimitFrameRate", "0"); // this doesn't work, just btw
   setValue("LimitTo16BitTex", "0");
 
   RegCloseKey(key);
@@ -215,21 +215,29 @@ int getMainMonitorHeight()
 
 int main(int argc, char** argv)
 {
+  DWORD doFullscreen = 1;
+  bool hook = true;
+  for (int i = 0; i < argc; i++)
+  {
+    if (strcmp(argv[i], "--no-hook") == 0)
+      hook = false;
+    if (strcmp(argv[i], "--windowed") == 0)
+      doFullscreen = 0;
+  }
+
   SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
 
   int screenHeight = getMainMonitorHeight();
+
+  if (!doFullscreen)
+    screenHeight = std::max(int(screenHeight * 0.8), 600);
 
   // Lots of stuff in the game assumes a 4:3 screen ratio - I tried to patch this out but I couldn't figure it out for now :(
   int adjustedScreenWidth = int(float(screenHeight) * 4.0f / 3.0f);
 
   writeGraphicsSettings(adjustedScreenWidth, screenHeight);
 
-  bool hook = true;
-  for (int i = 0; i < argc; i++)
-  {
-    if (strcmp(argv[i], "--no-hook") == 0)
-      hook = false;
-  }
+  release_assert(RegSetKeyValueA(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\LauncherCustomSettings", "DoFullscreen", REG_DWORD, &doFullscreen, sizeof(DWORD)) == ERROR_SUCCESS);
 
   createGlobalCommsFileMappingHandle();
 
