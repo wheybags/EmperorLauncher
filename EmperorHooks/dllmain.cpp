@@ -14,6 +14,7 @@
 #include "PatchDebugLog.hpp"
 #include "PatchSettings.hpp"
 #include "PatchLan.hpp"
+#include "PatchWndProcDuneIII.hpp"
 #include <string_view>
 #include <winternl.h>
 #include <Ntstatus.h>
@@ -75,13 +76,12 @@ SetWindowStyleAndDrainMessagesFuncType setWindowStyleAndDrainMessagesOriginal = 
 BOOL __cdecl setWindowStyleAndDrainMessages(HWND hWnd, int width, int height, char windowedMode)
 {
   SetWindowLongA(hWnd, GWL_STYLE, WS_POPUP);
-  int left = GetSystemMetrics(SM_CXSCREEN) / 2 - width / 2;
-  SetWindowPos(hWnd, HWND_TOPMOST, left, 0, width, height, SWP_SHOWWINDOW);
+  SetParent(hWnd, backgroundWindowHandle);
 
-  RECT rc = {};
-  GetWindowRect(*mainWindowHandleP, &rc);
-  myClipCursor(&rc);
-  
+  int left = GetSystemMetrics(SM_CXSCREEN) / 2 - width / 2;
+
+  SetWindowPos(hWnd, nullptr, left, 0, width, height, SWP_SHOWWINDOW);
+
   BOOL result;
   MSG msg;
   for (result = PeekMessageA(&msg, 0, 0, 0, 0); result; result = PeekMessageA(&msg, 0, 0, 0, 0))
@@ -92,35 +92,46 @@ BOOL __cdecl setWindowStyleAndDrainMessages(HWND hWnd, int width, int height, ch
     TranslateMessage(&msg);
     DispatchMessageA(&msg);
   }
+
+  SetForegroundWindow(hWnd);
+
   return result;
 }
 
-void backgroundWindow()
+LRESULT __stdcall backgroundWndProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
+{
+  if (Msg == WM_ACTIVATEAPP && wParam == FALSE)
+    ShowWindow(hWnd, SW_MINIMIZE);
+
+  return DefWindowProcA(hWnd, Msg, wParam, lParam);
+}
+
+
+void createBackgroundWindow()
 {
   backgroundWindowThreadId = GetCurrentThreadId();
 
-  // Register the window class.
   const char CLASS_NAME[] = "DuneIII background";
 
   WNDCLASSA wc = { };
-  wc.lpfnWndProc = DefWindowProcA;
+  wc.lpfnWndProc = backgroundWndProc;
   wc.hInstance = GetModuleHandleA(nullptr);
   wc.lpszClassName = CLASS_NAME;
   RegisterClassA(&wc);
 
   HWND temp = CreateWindowExA(
-    WS_EX_TOOLWINDOW,                              // Optional window styles.
-    CLASS_NAME,                     // Window class
-    nullptr,    // Window text
-    WS_POPUP,            // Window style
+      0,//WS_EX_TOOLWINDOW,                              // Optional window styles.
+      CLASS_NAME,                     // Window class
+      nullptr,    // Window text
+      WS_CLIPCHILDREN | WS_POPUP,            // Window style
 
-    // Size and position
-    CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
+      // Size and position
+      CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
 
-    NULL,       // Parent window    
-    NULL,       // Menu
-    wc.hInstance,  // Instance handle
-    NULL        // Additional application data
+      NULL,       // Parent window
+      NULL,       // Menu
+      wc.hInstance,  // Instance handle
+      NULL        // Additional application data
   );
 
   ShowWindow(temp, SW_MAXIMIZE);
@@ -130,7 +141,10 @@ void backgroundWindow()
   InvalidateRect(temp, nullptr, 1);
 
   backgroundWindowHandle = temp;
+}
 
+void backgroundWindowLoop()
+{
   BOOL bRet;
 
   MSG msg;
@@ -216,102 +230,13 @@ end:
   return status;
 }
 
-void windowSwitchHandlerLoop()
-{
-  while (!*mainWindowHandleP || !backgroundWindow)
-    Sleep(10);
-
-  HWND lastForeground = nullptr;
-  bool force = true;
-
-
-  while (true)
-  {
-    Sleep(1000);
-
-    HWND foreground = GetForegroundWindow();
-
-    DWORD dwProcId = 0;
-    if (!GetWindowThreadProcessId(foreground, &dwProcId))
-    {
-      printf("GetWindowThreadProcessId failed %d\n", GetLastError());
-    }
-    else
-    {
-      wchar_t* processPath = nullptr; 
-      NTSTATUS status = GetProcessPathById(dwProcId, &processPath);
-      if (status != S_OK)
-      {
-        printf("GetProcessPathById failed %d\n", status);
-      }
-      else
-      {
-        //printf("fg %d %d %S !!!\n", DWORD(foreground), dwProcId, processPath);
-
-        // sometimes during loading dwm.exe / WerFault.exe take over as the "Game.exe is not responding" window
-        bool isDwmExe = std::wstring_view(processPath).ends_with(L"\\dwm.exe");
-        bool isWerFaultExe = std::wstring_view(processPath).ends_with(L"\\WerFault.exe");
-
-        LocalFree(processPath);
-
-        if (isDwmExe || isWerFaultExe)
-          continue;
-      }
-    }
-
-    if (foreground == backgroundWindowHandle)
-    {
-      printf("bg was fg, fixing\n");
-      ShowWindow(*mainWindowHandleP, SW_SHOW);
-      SetForegroundWindow(*mainWindowHandleP);
-      lastForeground = *mainWindowHandleP;
-      Sleep(1000 * 3);
-      continue;
-    }
-    else if ((foreground == *mainWindowHandleP && lastForeground != *mainWindowHandleP) || force)
-    {
-      printf("SHOW START\n");
-
-      printf("    topmost bg\n");
-      SetWindowPos(backgroundWindowHandle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
-      printf("    show bg\n");
-      ShowWindow(backgroundWindowHandle, SW_SHOWMAXIMIZED);
-      SetForegroundWindow(backgroundWindowHandle);
-
-      //Sleep(1000 * 3);
-
-      printf("    topmost main\n");
-      SetWindowPos(*mainWindowHandleP, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_SHOWWINDOW);
-      printf("    show main\n");
-      ShowWindow(*mainWindowHandleP, SW_SHOW);
-      SetForegroundWindow(*mainWindowHandleP);
-
-      //Sleep(1000 * 3);
-
-      printf("SHOW DONE\n");
-      force = false;
-    }
-    else if (foreground != *mainWindowHandleP && lastForeground == *mainWindowHandleP)
-    {
-      printf("HIDE\n");
-      SetWindowPos(*mainWindowHandleP, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
-      ShowWindow(*mainWindowHandleP, SW_MINIMIZE);
-
-      SetWindowPos(backgroundWindowHandle, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
-      ShowWindow(backgroundWindowHandle, SW_MINIMIZE);
-    }
-
-    lastForeground = foreground;
-  }
-}
-
 __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOID reserved)
 {
   if (DetourIsHelperProcess()) {
     return TRUE;
   }
 
-  if (dwReason == DLL_PROCESS_ATTACH) 
+  if (dwReason == DLL_PROCESS_ATTACH)
   {
     DWORD doFullscreen = 1;
     DWORD size = sizeof(DWORD);
@@ -333,24 +258,25 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOI
 
     DetourAttach(&(PVOID&)doCdCheckOrig, doCdCheckPatched);
     DetourAttach(&(PVOID&)regSettingsOpenHkeyOrig, regSettingsOpenHkeyPatched);
+    DetourAttach(&(PVOID&)wndProcDuneIIIOrig, wndProcDuneIIIPatched);
     HookD3D7();
     patchDebugLog();
-    patchLan();
+    //patchLan();
     DetourTransactionCommit();
 
     patchD3D7ResolutionLimit();
 
     if (doFullscreen)
     {
-      std::thread([]() { backgroundWindow(); }).detach();
-      std::thread([]() { windowSwitchHandlerLoop(); }).detach();
+      createBackgroundWindow();
+      std::thread([]() { backgroundWindowLoop(); }).detach();
       std::thread([]()
       {
         while (true)
         {
           Sleep(1000 * 1);
           RECT rect;
-          if (GetWindowRect(*mainWindowHandleP, &rect))
+          if (*mainWindowHandleP && GetWindowRect(*mainWindowHandleP, &rect))
             myClipCursor(&rect);
         }
       }).detach();

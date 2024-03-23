@@ -108,6 +108,7 @@ nmake</Command>
     <ClInclude Include="PatchDebugLog.hpp" />
     <ClInclude Include="PatchLan.hpp" />
     <ClInclude Include="PatchSettings.hpp" />
+    <ClInclude Include="PatchWndProcDuneIII.hpp" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
@@ -119,6 +120,7 @@ nmake</Command>
     <ClCompile Include="PatchDebugLog.cpp" />
     <ClCompile Include="PatchLan.cpp" />
     <ClCompile Include="PatchSettings.cpp" />
+    <ClCompile Include="PatchWndProcDuneIII.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

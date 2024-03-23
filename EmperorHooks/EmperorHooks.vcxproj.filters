@@ -41,6 +41,7 @@
     <ClInclude Include="PatchLan.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="PatchWndProcDuneIII.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -68,6 +69,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="PatchLan.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PatchWndProcDuneIII.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
