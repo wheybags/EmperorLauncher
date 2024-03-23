@@ -63,6 +63,8 @@ void setupConsole()
 volatile HWND backgroundWindowHandle = nullptr;
 volatile DWORD backgroundWindowThreadId = 0;
 volatile bool focus = true;
+DWORD emperorLauncherDoFullscreen = 1;
+
 
 void myClipCursor(const RECT* rect)
 {
@@ -75,33 +77,53 @@ typedef BOOL(__cdecl* SetWindowStyleAndDrainMessagesFuncType)(HWND hWnd, int wid
 SetWindowStyleAndDrainMessagesFuncType setWindowStyleAndDrainMessagesOriginal = (SetWindowStyleAndDrainMessagesFuncType)0x004A7260;
 BOOL __cdecl setWindowStyleAndDrainMessages(HWND hWnd, int width, int height, char windowedMode)
 {
-  SetWindowLongA(hWnd, GWL_STYLE, WS_POPUP);
-  SetParent(hWnd, backgroundWindowHandle);
-
-  int left = GetSystemMetrics(SM_CXSCREEN) / 2 - width / 2;
-
-  SetWindowPos(hWnd, nullptr, left, 0, width, height, SWP_SHOWWINDOW);
-
-  BOOL result;
-  MSG msg;
-  for (result = PeekMessageA(&msg, 0, 0, 0, 0); result; result = PeekMessageA(&msg, 0, 0, 0, 0))
+  if (emperorLauncherDoFullscreen)
   {
-    GetMessageA(&msg, 0, 0, 0);
-    if (msg.message == WM_QUIT && (msg.hwnd == *mainWindowHandleP || (HWND)msg.wParam == *mainWindowHandleP))
-      *gDoQuitP = 1;
-    TranslateMessage(&msg);
-    DispatchMessageA(&msg);
+    SetWindowLongA(hWnd, GWL_STYLE, WS_POPUP);
+    SetParent(hWnd, backgroundWindowHandle);
+
+    int left = GetSystemMetrics(SM_CXSCREEN) / 2 - width / 2;
+    SetWindowPos(hWnd, nullptr, left, 0, width, height, SWP_SHOWWINDOW);
+
+    BOOL result;
+    MSG msg;
+    for (result = PeekMessageA(&msg, 0, 0, 0, 0); result; result = PeekMessageA(&msg, 0, 0, 0, 0))
+    {
+      GetMessageA(&msg, 0, 0, 0);
+      if (msg.message == WM_QUIT && (msg.hwnd == *mainWindowHandleP || (HWND)msg.wParam == *mainWindowHandleP))
+        *gDoQuitP = 1;
+      TranslateMessage(&msg);
+      DispatchMessageA(&msg);
+    }
+
+    SetForegroundWindow(hWnd);
+
+    return result;
   }
+  else
+  {
+    BOOL retval = setWindowStyleAndDrainMessagesOriginal(hWnd, width, height, windowedMode);
 
-  SetForegroundWindow(hWnd);
+    int left = GetSystemMetrics(SM_CXSCREEN) / 2 - width / 2;
+    int top = GetSystemMetrics(SM_CYSCREEN) / 2 - height / 2;
+    SetWindowPos(hWnd, nullptr, left, top, width, height, SWP_SHOWWINDOW);
 
-  return result;
+    return retval;
+  }
 }
 
 LRESULT __stdcall backgroundWndProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
 {
+  // minimise on focus loss
   if (Msg == WM_ACTIVATEAPP && wParam == FALSE)
     ShowWindow(hWnd, SW_MINIMIZE);
+
+  // we need to forward these events to the game window or input gets screwy, see comment in wndProcDuneIIIPatched()
+  if (*mainWindowHandleP && Msg == WM_ACTIVATEAPP)
+  {
+    SetFocus(*mainWindowHandleP);
+    wndProcDuneIIIPatched(*mainWindowHandleP, Msg, wParam, lParam);
+  }
 
   return DefWindowProcA(hWnd, Msg, wParam, lParam);
 }
@@ -230,6 +252,7 @@ end:
   return status;
 }
 
+
 __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOID reserved)
 {
   if (DetourIsHelperProcess()) {
@@ -238,9 +261,8 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOI
 
   if (dwReason == DLL_PROCESS_ATTACH)
   {
-    DWORD doFullscreen = 1;
     DWORD size = sizeof(DWORD);
-    HRESULT result = RegGetValueA(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\LauncherCustomSettings", "DoFullscreen", RRF_RT_REG_DWORD, nullptr, &doFullscreen, &size);
+    HRESULT result = RegGetValueA(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\LauncherCustomSettings", "DoFullscreen", RRF_RT_REG_DWORD, nullptr, &emperorLauncherDoFullscreen, &size);
 
     DetourRestoreAfterWith();
 
@@ -253,8 +275,7 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOI
     DetourAttach(&(PVOID&)OutputDebugStringAReal, OutputDebugStringAWrap);
     DetourAttach(&(PVOID&)OutputDebugStringWReal, OutputDebugStringWWrap);
     //DetourAttach(&(PVOID&)TrueShowCursor, FakeShowCursor);
-    if (doFullscreen)
-      DetourAttach(&(PVOID&)setWindowStyleAndDrainMessagesOriginal, setWindowStyleAndDrainMessages);
+    DetourAttach(&(PVOID&)setWindowStyleAndDrainMessagesOriginal, setWindowStyleAndDrainMessages);
 
     DetourAttach(&(PVOID&)doCdCheckOrig, doCdCheckPatched);
     DetourAttach(&(PVOID&)regSettingsOpenHkeyOrig, regSettingsOpenHkeyPatched);
@@ -266,21 +287,42 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOI
 
     patchD3D7ResolutionLimit();
 
-    if (doFullscreen)
+    if (emperorLauncherDoFullscreen)
     {
       createBackgroundWindow();
       std::thread([]() { backgroundWindowLoop(); }).detach();
-      std::thread([]()
-      {
-        while (true)
-        {
-          Sleep(1000 * 1);
-          RECT rect;
-          if (*mainWindowHandleP && GetWindowRect(*mainWindowHandleP, &rect))
-            myClipCursor(&rect);
-        }
-      }).detach();
     }
+
+    std::thread([]()
+    {
+      while (true)
+      {
+        Sleep(1000 * 1);
+
+        if (!*mainWindowHandleP)
+          continue;
+
+        RECT rect = {};
+        if (!GetClientRect(*mainWindowHandleP, &rect))
+          continue;
+
+        POINT topLeft = {0, 0};
+        if (!ClientToScreen(*mainWindowHandleP, &topLeft))
+          continue;
+
+        rect.left += topLeft.x;
+        rect.right += topLeft.x;
+        rect.top += topLeft.y;
+        rect.bottom += topLeft.y;
+
+        rect.left += 10;
+        rect.top += 10;
+        rect.right -= 10;
+        rect.bottom -= 10;
+
+        myClipCursor(&rect);
+      }
+    }).detach();
   }
 
   return TRUE;
