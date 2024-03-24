@@ -25,12 +25,6 @@ int __stdcall wndProcDuneIIIPatched(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM l
       doOnce = true;
     }
   }
-  else
-  {
-    // minimise on focus loss
-    if (Msg == WM_ACTIVATEAPP && wParam == FALSE)
-      ShowWindow(hWnd, SW_MINIMIZE);
-  }
 
   return wndProcDuneIIIOrig(hWnd, Msg, wParam, lParam);
 }

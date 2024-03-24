@@ -114,15 +114,17 @@ BOOL __cdecl setWindowStyleAndDrainMessages(HWND hWnd, int width, int height, ch
 
 LRESULT __stdcall backgroundWndProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
 {
-  // minimise on focus loss
-  if (Msg == WM_ACTIVATEAPP && wParam == FALSE)
-    ShowWindow(hWnd, SW_MINIMIZE);
+  if (Msg == WM_ACTIVATEAPP)
+  {
+    printf("GOT WM_ACTIVATEAPP %d\n", wParam);
+  }
 
   // we need to forward these events to the game window or input gets screwy, see comment in wndProcDuneIIIPatched()
   if (*mainWindowHandleP && Msg == WM_ACTIVATEAPP)
   {
     SetFocus(*mainWindowHandleP);
-    wndProcDuneIIIPatched(*mainWindowHandleP, Msg, wParam, lParam);
+    printf("FORWARD WM_ACTIVATEAPP %d\n", wParam);
+    SendMessageA(*mainWindowHandleP, Msg, wParam, lParam);
   }
 
   return DefWindowProcA(hWnd, Msg, wParam, lParam);
@@ -301,6 +303,12 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOI
 
         if (!*mainWindowHandleP)
           continue;
+
+        if (!emperorLauncherDoFullscreen)
+        {
+          if (*mainWindowHandleP != GetForegroundWindow())
+            continue;
+        }
 
         RECT rect = {};
         if (!GetClientRect(*mainWindowHandleP, &rect))
