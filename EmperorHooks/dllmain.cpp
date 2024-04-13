@@ -255,6 +255,33 @@ end:
 }
 
 
+// This patch forces the in game speed setting to apply to multiplayer games. Unpatched, the game will simply run as fast as the 
+// slowest client. The game does some calculation to determine what frame limit to use depending on the speed of all the other
+// clients, then sets it by calling CNetworkAdmin::setFrameLimit (this function). We override this function, and make sure that
+// the frame limit is never set higher than the current speed setting, but we only apply this limitation on the host. The other
+// clients in the game will automatically adjust their speed to match the speed limited host.
+
+// original is __thiscall, but we can't declare a thiscall func outside a class, so we fake it with fastcall and an unused edx param
+int __fastcall CNetworkAdmin_setFrameLimitPatched(CNetworkAdmin* This, DWORD edx, int value)
+{
+  // This isn't perfect, it is not set until a while after starting the game. Also it won't get reset if you 
+  // play single player after an mp game. Luckily, it doesn't seem to matter if we do or don't force the 
+  // frame limit in an sp game, so in practice it works well enough for our purposes.
+  bool isServer = networkTypeDerivedFromLogOutput == NetworkFromLogType::Server;
+
+  if (isServer)
+  {
+    CNetworkAdmin_setFrameLimitFromGlobalSettings(This);
+
+    if (value > This->frameLimit)
+      return This->frameLimit;
+  }
+
+  This->frameLimit = value;
+  return This->frameLimit;
+}
+
+
 __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOID reserved)
 {
   if (DetourIsHelperProcess()) {
@@ -282,9 +309,10 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOI
     DetourAttach(&(PVOID&)doCdCheckOrig, doCdCheckPatched);
     DetourAttach(&(PVOID&)regSettingsOpenHkeyOrig, regSettingsOpenHkeyPatched);
     DetourAttach(&(PVOID&)wndProcDuneIIIOrig, wndProcDuneIIIPatched);
+    DetourAttach(&(PVOID&)CNetworkAdmin_setFrameLimitOrig, CNetworkAdmin_setFrameLimitPatched);
     HookD3D7();
     patchDebugLog();
-    //patchLan();
+    patchLan();
     DetourTransactionCommit();
 
     patchD3D7ResolutionLimit();

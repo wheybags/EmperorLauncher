@@ -47,8 +47,8 @@ enum class ConnectionType
 };
 ConnectionType connectionType = ConnectionType::Server;
 
-#define netprintf(...) printf(__VA_ARGS__)
-//#define netprintf(...) do {} while (false)
+//#define netprintf(...) printf(__VA_ARGS__)
+#define netprintf(...) do {} while (false)
 
 
 int (PASCAL FAR* sendtoReal)(
@@ -244,7 +244,7 @@ int __fastcall SomeNetworkManager_SendLobbyMessageWrap(SomeNetworkManager * This
     {
       commandReply = L"connecting! target '" + std::wstring(target) + L"' (" + std::to_wstring(targetAddress.S_un.S_un_b.s_b1) + L"." +
                                                                                std::to_wstring(targetAddress.S_un.S_un_b.s_b2) + L"." +
-                                                                               std::to_wstring(targetAddress.S_un.S_un_b.s_b3) + L"." + 
+                                                                               std::to_wstring(targetAddress.S_un.S_un_b.s_b3) + L"." +
                                                                                std::to_wstring(targetAddress.S_un.S_un_b.s_b4) + L")";
 
       serverAddress.sin_family = AF_INET;

@@ -16,7 +16,7 @@
 
 LARGE_INTEGER lastFrameTime = {};
 LARGE_INTEGER qpcFreq = {};
-DWORD targetFps = 30;
+DWORD targetFps = 60;
 
 // Limit FPS to 60, some effects in the game just don't work at high FPS
 void* OriginalPointer_IDirect3DDevice7_EndScene = nullptr;
