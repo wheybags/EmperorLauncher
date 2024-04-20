@@ -104,18 +104,21 @@ nmake</Command>
     <ClInclude Include="GameExeImports.hpp" />
     <ClInclude Include="HookD3D7.hpp" />
     <ClInclude Include="DoCdCheck.hpp" />
+    <ClInclude Include="Log.hpp" />
     <ClInclude Include="PatchD3D7ResolutionLimit.hpp" />
     <ClInclude Include="PatchDebugLog.hpp" />
     <ClInclude Include="PatchLan.hpp" />
     <ClInclude Include="PatchSettings.hpp" />
     <ClInclude Include="PatchWndProcDuneIII.hpp" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="WrapWinsock.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="GameExeImports.cpp" />
     <ClCompile Include="HookD3D7.cpp" />
     <ClCompile Include="DoCdCheck.cpp" />
+    <ClCompile Include="Log.cpp" />
     <ClCompile Include="PatchD3D7ResolutionLimit.cpp" />
     <ClCompile Include="PatchDebugLog.cpp" />
     <ClCompile Include="PatchLan.cpp" />
@@ -125,6 +128,7 @@ nmake</Command>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="WrapWinsock.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

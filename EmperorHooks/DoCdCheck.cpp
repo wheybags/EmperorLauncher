@@ -4,6 +4,7 @@
 #include "DoCdCheck.hpp"
 #include <string>
 #include <filesystem>
+#include "Log.hpp"
 
 
 static char* __cdecl copyWstrToStrSimple(char* dest, wchar_t* src)
@@ -63,7 +64,7 @@ char __cdecl doCdCheckPatched(int cdIndex, char a2)
         LABEL_27:
           break;
         default:
-          printf("Invalid CD Check ID");
+          Log("Invalid CD Check ID");
           break;
       }
 
@@ -98,7 +99,7 @@ char __cdecl doCdCheckPatched(int cdIndex, char a2)
       // if we are using a CD, make sure we have the right one
       if (isPathADiskRoot(driveLetterPath))
       {
-        printf("Volume %s is a CD-ROM Drive\n", driveLetterPath);
+        Log("Volume %s is a CD-ROM Drive\n", driveLetterPath);
 
         CHAR VolumeNameBuffer[512];
         if (GetVolumeInformationA(driveLetterPath, VolumeNameBuffer, sizeof(VolumeNameBuffer) - 1, 0, 0, 0, 0, 0))

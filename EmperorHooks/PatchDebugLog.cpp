@@ -4,6 +4,7 @@
 #include <detours.h>
 #include "GameExeImports.hpp"
 #include "PatchDebugLog.hpp"
+#include "Log.hpp"
 
 struct PatchElement
 {
@@ -1644,23 +1645,23 @@ void LogPatched(const char* format, ...)
 
   va_list args = nullptr;
   va_start(args, format);
-  vprintf(format, args);
+  vaLog(format, args);
   va_end(args);
-  puts("");
+  Log("\n");
 }
 
 void Log2Patched(int someN, const char* format, ...)
 {
-  printf("%d: ", someN);
+  Log("%d: ", someN);
   va_list args = nullptr;
   va_start(args, format);
-  vprintf(format, args);
+  vaLog(format, args);
   va_end(args);
-  puts("");
+  Log("\n");
 }
 
-void (*Log)(const char* format, ...) = (void (*)(const char* format, ...))0x401CB5;
-void (*Log2)(int someN, const char* format, ...) = (void (*)(int someN, const char* format, ...))0x401CBA;
+void (*GameExeLog)(const char* format, ...) = (void (*)(const char* format, ...))0x401CB5;
+void (*GameExeLog2)(int someN, const char* format, ...) = (void (*)(int someN, const char* format, ...))0x401CBA;
 
 void patchDebugLog()
 {
@@ -1683,7 +1684,7 @@ void patchDebugLog()
 
     uint8_t* patchLocation = (uint8_t*)element.address;
     if (*patchLocation != element.original)
-      printf("bad patch! %p\n", patchLocation);
+      Log("bad patch! %p\n", patchLocation);
 
     *patchLocation = element.patched;
 
@@ -1691,6 +1692,6 @@ void patchDebugLog()
   }
 
   // These detours attach to the two new functions we just created
-  DetourAttach(&(PVOID&)Log, LogPatched);
-  DetourAttach(&(PVOID&)Log2, Log2Patched);
+  DetourAttach(&(PVOID&)GameExeLog, LogPatched);
+  DetourAttach(&(PVOID&)GameExeLog2, Log2Patched);
 }

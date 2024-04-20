@@ -18,6 +18,8 @@
 #include <string_view>
 #include <winternl.h>
 #include <Ntstatus.h>
+#include "WrapWinsock.hpp"
+#include "Log.hpp"
 
 
 int (WINAPI* TrueShowCursor)(BOOL bShow) = ShowCursor;
@@ -27,13 +29,13 @@ VOID(WINAPI* OutputDebugStringWReal) (_In_opt_ LPCWSTR lpOutputString) = OutputD
 
 VOID WINAPI OutputDebugStringAWrap(_In_opt_ LPCSTR lpOutputString)
 {
-  printf("OutputDebugStringA: %s", lpOutputString);
+  Log("OutputDebugStringA: %s", lpOutputString);
   OutputDebugStringAReal(lpOutputString);
 }
 
 VOID WINAPI OutputDebugStringWWrap(_In_opt_ LPCWSTR lpOutputString)
 {
-  wprintf(L"OutputDebugStringW: %s", lpOutputString);
+  Log("OutputDebugStringW: %S", lpOutputString);
   OutputDebugStringWReal(lpOutputString);
 }
 
@@ -116,14 +118,14 @@ LRESULT __stdcall backgroundWndProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM l
 {
   if (Msg == WM_ACTIVATEAPP)
   {
-    printf("GOT WM_ACTIVATEAPP %d\n", wParam);
+    Log("GOT WM_ACTIVATEAPP %d\n", wParam);
   }
 
   // we need to forward these events to the game window or input gets screwy, see comment in wndProcDuneIIIPatched()
   if (*mainWindowHandleP && Msg == WM_ACTIVATEAPP)
   {
     SetFocus(*mainWindowHandleP);
-    printf("FORWARD WM_ACTIVATEAPP %d\n", wParam);
+    Log("FORWARD WM_ACTIVATEAPP %d\n", wParam);
     SendMessageA(*mainWindowHandleP, Msg, wParam, lParam);
   }
 
@@ -312,10 +314,12 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOI
     DetourAttach(&(PVOID&)CNetworkAdmin_setFrameLimitOrig, CNetworkAdmin_setFrameLimitPatched);
     HookD3D7();
     patchDebugLog();
-    patchLan();
+    //patchLan();
     DetourTransactionCommit();
 
     patchD3D7ResolutionLimit();
+
+    wrapWinsock();
 
     if (emperorLauncherDoFullscreen)
     {
