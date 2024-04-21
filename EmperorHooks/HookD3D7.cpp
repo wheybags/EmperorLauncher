@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <mutex>
 #include "Error.hpp"
+#include "Log.hpp"
 
 
 LARGE_INTEGER lastFrameTime = {};
@@ -49,7 +50,7 @@ void* OriginalPointer_IDirect3D7_CreateDevice = nullptr;
 HRESULT(STDMETHODCALLTYPE* Real_IDirect3D7_CreateDevice)(IDirect3D7* This, REFCLSID rclsid, LPDIRECTDRAWSURFACE7 lpDDS, LPDIRECT3DDEVICE7* lplpD3DDevice) = nullptr;
 HRESULT STDMETHODCALLTYPE My_IDirect3D7_CreateDevice(IDirect3D7* This, REFCLSID rclsid, LPDIRECTDRAWSURFACE7 lpDDS, LPDIRECT3DDEVICE7* lplpD3DDevice)
 {
-  printf("!!!!!!!!!!!!!!!!! My_IDirect3D7_CreateDevice !!!!!!!!!!!!!!!!!!!\n");
+  Log("!!!!!!!!!!!!!!!!! My_IDirect3D7_CreateDevice !!!!!!!!!!!!!!!!!!!\n");
 
 
   IDirect3DDevice7* device = *lplpD3DDevice;
@@ -82,7 +83,7 @@ HRESULT STDMETHODCALLTYPE My_IDirect3D7_CreateDevice(IDirect3D7* This, REFCLSID 
 HRESULT(WINAPI* RealDirectDrawCreateEx)(GUID FAR* lpGuid, LPVOID* lplpDD, REFIID iid, IUnknown FAR* pUnkOuter) = nullptr;
 HRESULT WINAPI MyDirectDrawCreateEx(GUID FAR* lpGuid, LPVOID* lplpDD, REFIID iid, IUnknown FAR* pUnkOuter)
 {
-  printf("!!!!!!!!!!!!!!!!! MyDirectDrawCreateEx !!!!!!!!!!!!!!!!!!!\n");
+  Log("!!!!!!!!!!!!!!!!! MyDirectDrawCreateEx !!!!!!!!!!!!!!!!!!!\n");
 
   IDirectDraw7* directDraw = *((IDirectDraw7**)lplpDD);
   HRESULT result = RealDirectDrawCreateEx(lpGuid, (void**)&directDraw, iid, pUnkOuter);

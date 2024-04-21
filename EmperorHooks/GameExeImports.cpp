@@ -16,6 +16,11 @@ char(__cdecl* regSettingsOpenHkeyOrig)(char* fullPath, int createKey) = (char(__
 int(__thiscall* SomeNetworkManager_SendLobbyMessageOrig)(SomeNetworkManager* This, __int16 a2, int a3, wchar_t* message, char a5) = (int(__thiscall *)(SomeNetworkManager * This, __int16 a2, int a3, wchar_t* message, char a5))0x004D96A0;
 int(__stdcall* wndProcDuneIIIOrig)(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam) = (int(__stdcall*)(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)) 0x004A6560;
 int(__thiscall* CNetworkAdmin_setFrameLimitOrig)(CNetworkAdmin* This, int value) = (int(__thiscall*)(CNetworkAdmin * This, int value)) 0x00406220;
+u_short(*CPortUtil_Get_Free_Random_Port_HOrig)() = (u_short(*)())0x00518850;
+bool(__cdecl* testPort)(u_short hostshort) = (bool(__cdecl*)(u_short hostshort))0x00507250;
+void(__cdecl* CPortUtil_Set_Port_RangeOrig)(unsigned __int16 port_h_min, unsigned __int16 port_h_max) = (void(__cdecl*)(unsigned __int16 port_h_min, unsigned __int16 port_h_max))0x005AEF60;
+void(*CMangler_Pattern_QueryOrig)() = (void(*)())0x005AC370;
+void(__cdecl* sendPortRangeUpdatePacketOrig)(void* p_user, int Id, unsigned __int16 port_h_min, unsigned __int16 port_h_max) = (void(__cdecl*)(void* p_user, int Id, unsigned __int16 port_h_min, unsigned __int16 port_h_max))0x005ACB50;
 
 DWORD* dword_B7D098P = (DWORD*)0xB7D098;
 

@@ -1,111 +1,14 @@
 #include "pch.h"
 #include <detours.h>
-#include <winsock.h>
 #include <string>
 #include "Log.hpp"
+#include "WinsockApi.hpp"
 
 #define netprintf(format, ...) Log("\033[33m" format "\033[0m", __VA_ARGS__)
-//#define netprintf(...) do {} while (false)
 
-
-static std::string sockaddrToString(const sockaddr_in* addr)
-{
-  return std::string(inet_ntoa(addr->sin_addr)) + ":" + std::to_string(ntohs(addr->sin_port));
-}
-
-static std::string sockaddrToString(const sockaddr* addr)
-{
-  if (addr->sa_family == AF_UNSPEC)
-    return "empty";
-
-  if (addr->sa_family != AF_INET)
-    return "ERR: NOT IPV4: " + std::to_string(addr->sa_family);
-
-  return sockaddrToString((const sockaddr_in*)addr);
-}
-
-static std::string socketToString(SOCKET s)
-{
-  if (s == INVALID_SOCKET)
-    return "INVALID_SOCKET";
-
-  sockaddr sa = {};
-  int len = sizeof(sockaddr);
-
-  if (getsockname(s, &sa, &len))
-    return std::string("getsockname error ") + std::to_string(WSAGetLastError());
-
-  int type = 0;
-  int length = sizeof(int);
-  getsockopt(s, SOL_SOCKET, SO_TYPE, (char*)&type, &length);
-
-  return sockaddrToString(&sa) + " type: " + std::to_string(type);
-}
-
-static std::string wsaErrorToString(int err)
-{
-  switch (err)
-  {
-    case 0: return "SUCCESS";
-    case WSAEINTR: return "WSAEINTR";
-    case WSAEBADF: return "WSAEBADF";
-    case WSAEACCES: return "WSAEACCES";
-    case WSAEFAULT: return "WSAEFAULT";
-    case WSAEINVAL: return "WSAEINVAL";
-    case WSAEMFILE: return "WSAEMFILE";
-    case WSAEWOULDBLOCK: return "WSAEWOULDBLOCK";
-    case WSAEINPROGRESS: return "WSAEINPROGRESS";
-    case WSAEALREADY: return "WSAEALREADY";
-    case WSAENOTSOCK: return "WSAENOTSOCK";
-    case WSAEDESTADDRREQ: return "WSAEDESTADDRREQ";
-    case WSAEMSGSIZE: return "WSAEMSGSIZE";
-    case WSAEPROTOTYPE: return "WSAEPROTOTYPE";
-    case WSAENOPROTOOPT: return "WSAENOPROTOOPT";
-    case WSAEPROTONOSUPPORT: return "WSAEPROTONOSUPPORT";
-    case WSAESOCKTNOSUPPORT: return "WSAESOCKTNOSUPPORT";
-    case WSAEOPNOTSUPP: return "WSAEOPNOTSUPP";
-    case WSAEPFNOSUPPORT: return "WSAEPFNOSUPPORT";
-    case WSAEAFNOSUPPORT: return "WSAEAFNOSUPPORT";
-    case WSAEADDRINUSE: return "WSAEADDRINUSE";
-    case WSAEADDRNOTAVAIL: return "WSAEADDRNOTAVAIL";
-    case WSAENETDOWN: return "WSAENETDOWN";
-    case WSAENETUNREACH: return "WSAENETUNREACH";
-    case WSAENETRESET: return "WSAENETRESET";
-    case WSAECONNABORTED: return "WSAECONNABORTED";
-    case WSAECONNRESET: return "WSAECONNRESET";
-    case WSAENOBUFS: return "WSAENOBUFS";
-    case WSAEISCONN: return "WSAEISCONN";
-    case WSAENOTCONN: return "WSAENOTCONN";
-    case WSAESHUTDOWN: return "WSAESHUTDOWN";
-    case WSAETOOMANYREFS: return "WSAETOOMANYREFS";
-    case WSAETIMEDOUT: return "WSAETIMEDOUT";
-    case WSAECONNREFUSED: return "WSAECONNREFUSED";
-    case WSAELOOP: return "WSAELOOP";
-    case WSAENAMETOOLONG: return "WSAENAMETOOLONG";
-    case WSAEHOSTDOWN: return "WSAEHOSTDOWN";
-    case WSAEHOSTUNREACH: return "WSAEHOSTUNREACH";
-    case WSAENOTEMPTY: return "WSAENOTEMPTY";
-    case WSAEPROCLIM: return "WSAEPROCLIM";
-    case WSAEUSERS: return "WSAEUSERS";
-    case WSAEDQUOT: return "WSAEDQUOT";
-    case WSAESTALE: return "WSAESTALE";
-    case WSAEREMOTE: return "WSAEREMOTE";
-    case WSAEDISCON: return "WSAEDISCON";
-    case WSASYSNOTREADY: return "WSASYSNOTREADY";
-    case WSAVERNOTSUPPORTED: return "WSAVERNOTSUPPORTED";
-    case WSANOTINITIALISED: return "WSANOTINITIALISED";
-    case WSAHOST_NOT_FOUND: return "WSAHOST_NOT_FOUND";
-    case WSATRY_AGAIN: return "WSATRY_AGAIN";
-    case WSANO_RECOVERY: return "WSANO_RECOVERY";
-    case WSANO_DATA: return "WSANO_DATA";
-    case WSA_SECURE_HOST_NOT_FOUND: return "WSA_SECURE_HOST_NOT_FOUND";
-    case WSA_IPSEC_NAME_POLICY_ERROR: return "WSA_IPSEC_NAME_POLICY_ERROR";
-    default: return "UNKNOWN(" + std::to_string(err) + ")";
-  }
-}
 
 // A list of all winsock functions imported by Game.exe and WOLAPI.DLL:
-// WSAAsyncGetHostByName    
+// WSAAsyncGetHostByName
 // WSAAsyncSelect           wrapped
 // WSACancelAsyncRequest
 // WSACleanup               not interesting
@@ -135,24 +38,9 @@ static std::string wsaErrorToString(int err)
 // select
 // send                     wrapped
 // sendto                   wrapped
-// setsockopt
-// shutdown                 wrapped 
+// setsockopt               wrapped
+// shutdown                 wrapped
 // socket                   wrapped
-
-
-typedef int (PASCAL* PFN_WSAAsyncSelect)(SOCKET s, HWND hWnd, u_int wMsg, long lEvent);
-typedef int (PASCAL* PFN_listen)(SOCKET s, int backlog);
-typedef SOCKET (PASCAL* PFN_accept)(SOCKET s, struct sockaddr* addr, int* addrlen);
-typedef int (PASCAL* PFN_shutdown)(SOCKET s, int how);
-typedef int (PASCAL* PFN_connect)(SOCKET s, const struct sockaddr* name, int namelen);
-typedef SOCKET (PASCAL* PFN_socket)(int af, int type, int protocol);
-typedef int (PASCAL* PFN_closesocket)(SOCKET s);
-typedef int (PASCAL* PFN_sendto)(SOCKET s, const char* buf, int len, int flags, const struct sockaddr* to, int tolen);
-typedef int (PASCAL* PFN_recvfrom)(SOCKET s, char* buf, int len, int flags, struct sockaddr* from, int* fromlen);
-typedef int (PASCAL* PFN_bind)(SOCKET s, const struct sockaddr* addr, int namelen);
-typedef int (PASCAL* PFN_recv)(SOCKET s, char* buf, int len, int flags);
-typedef int (PASCAL* PFN_send)(SOCKET s, const char* buf, int len, int flags);
-typedef int (PASCAL* PFN_select)(int nfds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, const struct timeval* timeout);
 
 static PFN_WSAAsyncSelect WSAAsyncSelect_orig = nullptr;
 static PFN_listen listen_orig = nullptr;
@@ -167,6 +55,8 @@ static PFN_connect connect_orig = nullptr;
 static PFN_recv recv_orig = nullptr;
 static PFN_send send_orig = nullptr;
 static PFN_select select_orig = nullptr;
+static PFN_setsockopt setsockopt_orig = nullptr;
+static PFN_ioctlsocket ioctlsocket_orig = nullptr;
 
 static int PASCAL WSAAsyncSelect_wrap(SOCKET s, HWND hWnd, u_int wMsg, long lEvent)
 {
@@ -257,12 +147,12 @@ static int PASCAL closesocket_wrap(SOCKET s)
 static int PASCAL sendto_wrap(SOCKET s, const char* buf, int len, int flags, const struct sockaddr* to, int tolen)
 {
   netprintf("sendto: socket: %u, len: %d, flags: %d to: %s\n", s, len, flags, sockaddrToString(to).c_str());
-  
+
   int ret = sendto_orig(s, buf, len, flags, to, tolen);
   int err = WSAGetLastError();
-  
+
   netprintf("    -> %d %s\n", ret, wsaErrorToString(err).c_str());
-  
+
   WSASetLastError(err);
   return ret;
 }
@@ -285,12 +175,12 @@ static int PASCAL recvfrom_wrap(SOCKET s, char* buf, int len, int flags, struct 
 static int PASCAL bind_wrap(SOCKET s, const struct sockaddr* addr, int namelen)
 {
   netprintf("bind: socket: %u addr: %s\n", s, sockaddrToString(addr).c_str());
-  
+
   int ret = bind_orig(s, addr, namelen);
   int err = WSAGetLastError();
 
   netprintf("    -> %d %s\n", ret, wsaErrorToString(err).c_str());
-  
+
   WSASetLastError(err);
   return ret;
 }
@@ -334,11 +224,77 @@ static int PASCAL send_wrap(SOCKET s, const char* buf, int len, int flags)
   return ret;
 }
 
+static std::string fd_set_tostring(const fd_set* set)
+{
+  if (!set)
+    return "null";
+
+  std::string retval = "[";
+  for (u_int i = 0; i < set->fd_count; i++)
+    retval += std::to_string(set->fd_array[i]) + ",";
+
+  if (retval.size() > 1)
+    retval.resize(retval.size() - 1);
+
+  retval += "]";
+
+  return retval;
+}
+
 static int PASCAL select_wrap(int nfds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, const struct timeval* timeout)
 {
   netprintf("select:\n");
+  netprintf(" readfds: %s\n", fd_set_tostring(readfds).c_str());
+  netprintf(" writefds: %s\n", fd_set_tostring(writefds).c_str());
+  netprintf(" exceptfds: %s\n", fd_set_tostring(exceptfds).c_str());
 
   int ret = select_orig(nfds, readfds, writefds, exceptfds, timeout);
+  int err = WSAGetLastError();
+
+  netprintf("    -> readfds: %s\n", fd_set_tostring(readfds).c_str());
+  netprintf("    -> writefds: %s\n", fd_set_tostring(writefds).c_str());
+  netprintf("    -> exceptfds: %s\n", fd_set_tostring(exceptfds).c_str());
+  netprintf("    -> %d %s\n", ret, wsaErrorToString(err).c_str());
+
+  WSASetLastError(err);
+  return ret;
+}
+
+static std::string sockopt_to_string(int level, int opt)
+{
+  if (level == SOL_SOCKET)
+  {
+    switch (opt)
+    {
+      case SO_DEBUG: return "SO_DEBUG";
+      case SO_ACCEPTCONN: return "SO_ACCEPTCONN";
+      case SO_REUSEADDR: return "SO_REUSEADDR";
+      case SO_KEEPALIVE: return "SO_KEEPALIVE";
+      case SO_DONTROUTE: return "SO_DONTROUTE";
+      case SO_BROADCAST: return "SO_BROADCAST";
+      case SO_USELOOPBACK: return "SO_USELOOPBACK";
+      case SO_LINGER: return "SO_LINGER";
+      case SO_OOBINLINE: return "SO_OOBINLINE";
+      case SO_DONTLINGER: return "SO_DONTLINGER";
+      case SO_SNDBUF: return "SO_SNDBUF";
+      case SO_RCVBUF: return "SO_RCVBUF";
+      case SO_SNDLOWAT: return "SO_SNDLOWAT";
+      case SO_RCVLOWAT: return "SO_RCVLOWAT";
+      case SO_SNDTIMEO: return "SO_SNDTIMEO";
+      case SO_RCVTIMEO: return "SO_RCVTIMEO";
+      case SO_ERROR: return "SO_ERROR";
+      case SO_TYPE: return "SO_TYPE";
+    }
+  }
+
+  return "unknown(" + std::to_string(opt) + ")";
+}
+
+static int PASCAL setsockopt_wrap(SOCKET s, int level, int optname, const char* optval, int optlen)
+{
+  netprintf("setsockopt: socket: %u, level: %d, optname: %s\n", s, level, sockopt_to_string(level, optname).c_str());
+
+  int ret = setsockopt_orig(s, level, optname, optval, optlen);
   int err = WSAGetLastError();
 
   netprintf("    -> %d %s\n", ret, wsaErrorToString(err).c_str());
@@ -347,7 +303,23 @@ static int PASCAL select_wrap(int nfds, fd_set* readfds, fd_set* writefds, fd_se
   return ret;
 }
 
-void wrapWinsock()
+static int PASCAL ioctlsocket_wrap(SOCKET s, long cmd, u_long* argp)
+{
+  if (cmd == FIONBIO)
+    netprintf("ioctlsocket: socket: %u, cmd: FIONBIO, val: %lu\n", s, cmd, *argp);
+  else
+    netprintf("ioctlsocket: socket: %u, cmd: %d\n", s, cmd);
+
+  int ret = ioctlsocket_orig(s, cmd, argp);
+  int err = WSAGetLastError();
+
+  netprintf("    -> %d %s\n", ret, wsaErrorToString(err).c_str());
+
+  WSASetLastError(err);
+  return ret;
+}
+
+void wrapWinsockWithLogging()
 {
   HMODULE wsock = LoadLibraryA("wsock32.dll");
 
@@ -364,6 +336,8 @@ void wrapWinsock()
   recv_orig = (PFN_recv)GetProcAddress(wsock, "recv");
   send_orig = (PFN_send)GetProcAddress(wsock, "send");
   select_orig = (PFN_select)GetProcAddress(wsock, "select");
+  setsockopt_orig = (PFN_setsockopt)GetProcAddress(wsock, "setsockopt");
+  ioctlsocket_orig = (PFN_ioctlsocket)GetProcAddress(wsock, "ioctlsocket");
 
 
   DetourTransactionBegin();
@@ -382,7 +356,8 @@ void wrapWinsock()
   DetourAttach(&(PVOID&)recv_orig, recv_wrap);
   DetourAttach(&(PVOID&)send_orig, send_wrap);
   DetourAttach(&(PVOID&)select_orig, select_wrap);
-
+  DetourAttach(&(PVOID&)setsockopt_orig, setsockopt_wrap);
+  DetourAttach(&(PVOID&)ioctlsocket_orig, ioctlsocket_wrap);
 
   DetourTransactionCommit();
 }

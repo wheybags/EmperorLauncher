@@ -20,6 +20,8 @@
 #include <Ntstatus.h>
 #include "WrapWinsock.hpp"
 #include "Log.hpp"
+#include "GamePacketProxy.hpp"
+#include "Error.hpp"
 
 
 int (WINAPI* TrueShowCursor)(BOOL bShow) = ShowCursor;
@@ -257,7 +259,7 @@ end:
 }
 
 
-// This patch forces the in game speed setting to apply to multiplayer games. Unpatched, the game will simply run as fast as the 
+// This patch forces the in game speed setting to apply to multiplayer games. Unpatched, the game will simply run as fast as the
 // slowest client. The game does some calculation to determine what frame limit to use depending on the speed of all the other
 // clients, then sets it by calling CNetworkAdmin::setFrameLimit (this function). We override this function, and make sure that
 // the frame limit is never set higher than the current speed setting, but we only apply this limitation on the host. The other
@@ -266,8 +268,8 @@ end:
 // original is __thiscall, but we can't declare a thiscall func outside a class, so we fake it with fastcall and an unused edx param
 int __fastcall CNetworkAdmin_setFrameLimitPatched(CNetworkAdmin* This, DWORD edx, int value)
 {
-  // This isn't perfect, it is not set until a while after starting the game. Also it won't get reset if you 
-  // play single player after an mp game. Luckily, it doesn't seem to matter if we do or don't force the 
+  // This isn't perfect, it is not set until a while after starting the game. Also it won't get reset if you
+  // play single player after an mp game. Luckily, it doesn't seem to matter if we do or don't force the
   // frame limit in an sp game, so in practice it works well enough for our purposes.
   bool isServer = networkTypeDerivedFromLogOutput == NetworkFromLogType::Server;
 
@@ -281,6 +283,16 @@ int __fastcall CNetworkAdmin_setFrameLimitPatched(CNetworkAdmin* This, DWORD edx
 
   This->frameLimit = value;
   return This->frameLimit;
+}
+
+
+// skips the attempt to use port mangling
+void CMangler_Pattern_QueryPatched()
+{
+
+  //bool* IsPortManglerPtr = (bool*)0x00B7E7B0;
+  //Log("AAAAAAAAAAAAAAAAAAAAAAAAA %d\n", int(*IsPortManglerPtr));
+  return;
 }
 
 
@@ -312,6 +324,7 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOI
     DetourAttach(&(PVOID&)regSettingsOpenHkeyOrig, regSettingsOpenHkeyPatched);
     DetourAttach(&(PVOID&)wndProcDuneIIIOrig, wndProcDuneIIIPatched);
     DetourAttach(&(PVOID&)CNetworkAdmin_setFrameLimitOrig, CNetworkAdmin_setFrameLimitPatched);
+    DetourAttach(&(PVOID&)CMangler_Pattern_QueryOrig, CMangler_Pattern_QueryPatched);
     HookD3D7();
     patchDebugLog();
     //patchLan();
@@ -319,7 +332,12 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOI
 
     patchD3D7ResolutionLimit();
 
-    wrapWinsock();
+    wrapWinsockWithLogging();
+
+    if (!serverAddress.empty())
+      installProxyClient(serverAddress);
+    else
+      installProxyServer();
 
     if (emperorLauncherDoFullscreen)
     {

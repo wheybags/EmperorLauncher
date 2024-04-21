@@ -1,40 +1,11 @@
 #include "pch.h"
-#include <winsock.h>
+#include "WinsockApi.hpp"
 #include <Windows.h>
 #include <string>
 #include <vector>
 #include <detours.h>
 #include "GameExeImports.hpp"
 
-std::string sockaddrToString(const sockaddr_in* addr)
-{
-  return "family: " + std::to_string(addr->sin_family) + " " + std::string(inet_ntoa(addr->sin_addr)) + ":" + std::to_string(ntohs(addr->sin_port));
-}
-
-std::string sockaddrToString(const sockaddr* addr)
-{
-  if (addr->sa_family != AF_INET)
-    return "ERR: NOT IPV4";
-  return sockaddrToString((const sockaddr_in*)addr);
-}
-
-std::string socketToString(SOCKET s)
-{
-  if (s == INVALID_SOCKET)
-    return "INVALID_SOCKET";
-
-  sockaddr sa = {};
-  int len = sizeof(sockaddr);
-
-  if (getsockname(s, &sa, &len))
-    return std::string("getsockname error ") + std::to_string(WSAGetLastError());
-
-  int type = 0;
-  int length = sizeof(int);
-  getsockopt(s, SOL_SOCKET, SO_TYPE, (char*)&type, &length);
-
-  return sockaddrToString(&sa) + " type: " + std::to_string(type);
-}
 
 std::vector<std::pair<in_addr, sockaddr_in>> connectionsMapping;
 sockaddr_in serverAddress = {};

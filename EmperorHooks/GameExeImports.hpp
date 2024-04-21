@@ -58,6 +58,11 @@ extern char (__cdecl* regSettingsOpenHkeyOrig)(char* fullPath, int createKey);
 extern int(__thiscall* SomeNetworkManager_SendLobbyMessageOrig)(SomeNetworkManager* This, __int16 a2, int a3, wchar_t* message, char a5);
 extern int(__stdcall* wndProcDuneIIIOrig)(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam);
 extern int(__thiscall* CNetworkAdmin_setFrameLimitOrig)(CNetworkAdmin* This, int value);
+extern u_short(*CPortUtil_Get_Free_Random_Port_HOrig)();
+extern bool(__cdecl* testPort)(u_short hostshort);
+extern void(__cdecl* CPortUtil_Set_Port_RangeOrig)(unsigned __int16 port_h_min, unsigned __int16 port_h_max);
+extern void(*CMangler_Pattern_QueryOrig)();
+extern void(__cdecl* sendPortRangeUpdatePacketOrig)(void* p_user, int Id, unsigned __int16 port_h_min, unsigned __int16 port_h_max);
 
 extern DWORD* dword_B7D098P;
 
@@ -80,3 +85,4 @@ extern int* somethingThatControlsExitingCdCheckLoopP;
 #define maybeDontFreeContext IMP(char, 0x007D75AD)
 #define gContext IMP(GraphicsContext*, 0x007D75B4)
 #define gNetworkAdmin1 IMP(CNetworkAdmin*, 0x007CB9D4)
+#define onlineGameHostPort IMP(u_short, 0x00B74C68)

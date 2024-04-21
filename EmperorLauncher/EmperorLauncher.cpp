@@ -217,12 +217,28 @@ int main(int argc, char** argv)
 {
   DWORD doFullscreen = 1;
   bool hook = true;
-  for (int i = 0; i < argc; i++)
+  std::string serverAddress;
+
+  for (int i = 1; i < argc; i++)
   {
     if (strcmp(argv[i], "--no-hook") == 0)
+    {
       hook = false;
-    if (strcmp(argv[i], "--windowed") == 0)
+    }
+    else if (strcmp(argv[i], "--windowed") == 0)
+    {
       doFullscreen = 0;
+    }
+    else if (strcmp(argv[i], "--connect") == 0)
+    {
+      release_assert(i + 1 < argc);
+      serverAddress = argv[i + 1];
+      i++;
+    }
+    else
+    {
+      release_assert(false);
+    }
   }
 
   SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
@@ -238,6 +254,7 @@ int main(int argc, char** argv)
   writeGraphicsSettings(adjustedScreenWidth, screenHeight);
 
   release_assert(RegSetKeyValueA(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\LauncherCustomSettings", "DoFullscreen", REG_DWORD, &doFullscreen, sizeof(DWORD)) == ERROR_SUCCESS);
+  release_assert(RegSetKeyValueA(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\LauncherCustomSettings", "ServerAddress", REG_SZ, serverAddress.data(), DWORD(serverAddress.size())) == ERROR_SUCCESS);
 
   createGlobalCommsFileMappingHandle();
 

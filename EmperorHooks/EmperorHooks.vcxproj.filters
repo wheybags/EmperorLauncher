@@ -48,6 +48,15 @@
     <ClInclude Include="Log.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="WinsockApi.hpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GamePacketProxy.hpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CRC.hpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -84,6 +93,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Log.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="WinsockApi.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GamePacketProxy.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
