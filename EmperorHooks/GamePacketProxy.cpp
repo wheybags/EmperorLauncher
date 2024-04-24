@@ -11,6 +11,7 @@
 #include <mutex>
 #include <queue>
 #include "CRC.hpp"
+#include <optional>
 
 
 #define proxylog(format, ...) Log("\033[32m" format "\033[0m", __VA_ARGS__)
@@ -49,17 +50,83 @@ protected:
   virtual int forwardSend(SOCKET s, const char* buf, int len, int flags, const struct sockaddr* to, int tolen, SOCKET forwardSock, sockaddr_in& forwardTo);
 
   virtual int sendto_override(SOCKET s, const char* buf, int len, int flags, const struct sockaddr* to, int tolen) = 0;
-  virtual int recvfrom_override(SOCKET s, char* buf, int len, int flags, struct sockaddr* from, int* fromlen);
+  int recvfrom_override(SOCKET s, char* buf, int len, int flags, struct sockaddr* from, int* fromlen);
+  int WSAAsyncSelect_override(SOCKET s, HWND hWnd, u_int wMsg, long lEvent);
+  int connect_override(SOCKET s, const struct sockaddr* name, int namelen);
+  int send_override(SOCKET s, const char* buf, int len, int flags);
+  int recv_override(SOCKET s, char* buf, int len, int flags);
 
   PFN_sendto sendto_orig = nullptr;
   PFN_recvfrom recvfrom_orig = nullptr;
+  PFN_WSAAsyncSelect WSAAsyncSelect_orig = nullptr;
+  PFN_connect connect_orig = nullptr;
+  PFN_send send_orig = nullptr;
+  PFN_recv recv_orig = nullptr;
 
   static Proxy* staticProxy;
   static int PASCAL sendto_override_static(SOCKET s, const char* buf, int len, int flags, const struct sockaddr* to, int tolen) { return staticProxy->sendto_override(s, buf, len, flags, to, tolen); }
   static int PASCAL recvfrom_override_static(SOCKET s, char* buf, int len, int flags, struct sockaddr* from, int* fromlen) { return staticProxy->recvfrom_override(s, buf, len, flags, from, fromlen); }
+  static int PASCAL WSAAsyncSelect_override_static(SOCKET s, HWND hWnd, u_int wMsg, long lEvent) { return staticProxy->WSAAsyncSelect_override(s, hWnd, wMsg, lEvent); }
+  static int PASCAL connect_override_static(SOCKET s, const struct sockaddr* name, int namelen) { return staticProxy->connect_override(s, name, namelen); }
+  static int PASCAL send_override_static(SOCKET s, const char* buf, int len, int flags) { return staticProxy->send_override(s, buf, len, flags); }
+  static int PASCAL recv_override_static(SOCKET s, char* buf, int len, int flags) { return staticProxy->recv_override(s, buf, len, flags); }
 
   std::mutex mutex;
   std::map<u_short, std::queue<ReceivedPacket>> receivedPacketsByPort;
+
+  struct SocketData
+  {
+    SOCKET sock = 0;
+    std::optional<sockaddr_in> bindAddr;
+    std::optional<sockaddr_in> connectAddr;
+
+    bool isAsyncSelectRegistered = false;
+
+    bool readEventSent = false;
+    HWND asyncSelectHWnd = nullptr;
+    u_int asyncSelectWMsg = 0;
+    long asyncSelectLEvent = 0;
+
+    void sendReadEvent()
+    {
+      proxylog("sending aysnc read event for sock %u\n", sock);
+      PostMessageA(asyncSelectHWnd, asyncSelectWMsg, sock, FD_READ);
+      readEventSent = true;
+    }
+
+    void sendWriteEvent()
+    {
+      proxylog("sending aysnc write event for sock %u\n", sock);
+      PostMessageA(asyncSelectHWnd, asyncSelectWMsg, sock, FD_WRITE);
+      readEventSent = true;
+    }
+  };
+
+  std::vector<SocketData> sockets;
+
+  SocketData* tryGetSocketData(SOCKET s)
+  {
+    for (SocketData& sock : this->sockets)
+    {
+      if (sock.sock == s)
+        return &sock;
+    }
+
+    return nullptr;
+  }
+
+  SocketData& getOrCreateSocketData(SOCKET s)
+  {
+    for (SocketData& sock : this->sockets)
+    {
+      if (sock.sock == s)
+        return sock;
+    }
+
+    SocketData& retval = this->sockets.emplace_back();
+    retval.sock = s;
+    return retval;
+  }
 };
 
 Proxy* Proxy::staticProxy = nullptr;
@@ -72,27 +139,39 @@ void Proxy::installHooks()
 
   sendto_orig = (PFN_sendto)GetProcAddress(wsock, "sendto");
   recvfrom_orig = (PFN_recvfrom)GetProcAddress(wsock, "recvfrom");
-
+  WSAAsyncSelect_orig = (PFN_WSAAsyncSelect)GetProcAddress(wsock, "WSAAsyncSelect");
+  connect_orig = (PFN_connect)GetProcAddress(wsock, "connect");
+  send_orig = (PFN_send)GetProcAddress(wsock, "send");
+  recv_orig = (PFN_recv)GetProcAddress(wsock, "recv");
 
   DetourTransactionBegin();
   DetourUpdateThread(GetCurrentThread());
 
   DetourAttach(&(PVOID&)sendto_orig, sendto_override_static);
   DetourAttach(&(PVOID&)recvfrom_orig, recvfrom_override_static);
+  DetourAttach(&(PVOID&)WSAAsyncSelect_orig, WSAAsyncSelect_override_static);
+  DetourAttach(&(PVOID&)connect_orig, connect_override_static);
+  DetourAttach(&(PVOID&)send_orig, send_override_static);
+  DetourAttach(&(PVOID&)recv_orig, recv_override_static);
 
   DetourTransactionCommit();
 }
 
 int Proxy::recvfrom_override(SOCKET s, char* buf, int len, int flags, struct sockaddr* from, int* fromlen)
 {
+  std::scoped_lock lock(this->mutex);
+
+  SocketData* socketData = tryGetSocketData(s);
+
+  if (socketData)
+    socketData->readEventSent = false;
+
   sockaddr_in boundAddr = {};
   int size = sizeof(sockaddr_in);
   release_assert(getsockname(s, (sockaddr*)&boundAddr, &size) == 0);
 
   int portH = ntohs(boundAddr.sin_port);
   proxylog("Proxy::recvfrom_override socket: %u, len: %d, flags: %d, port: %d\n", s, len, flags, portH);
-
-  std::scoped_lock lock(this->mutex);
 
   auto it = this->receivedPacketsByPort.find(portH);
   if (it != this->receivedPacketsByPort.end() && !it->second.empty())
@@ -112,6 +191,9 @@ int Proxy::recvfrom_override(SOCKET s, char* buf, int len, int flags, struct soc
     int retval = int(packet.data.size());
     it->second.pop();
 
+    if (!it->second.empty() && socketData && socketData->isAsyncSelectRegistered)
+      socketData->sendReadEvent();
+
     proxylog("    -> SUCCESS %d\n", retval);
     WSASetLastError(0);
     return retval;
@@ -124,9 +206,101 @@ int Proxy::recvfrom_override(SOCKET s, char* buf, int len, int flags, struct soc
   //return this->recvfrom_orig(s, buf, len, flags, from, fromlen);
 }
 
+int Proxy::WSAAsyncSelect_override(SOCKET s, HWND hWnd, u_int wMsg, long lEvent)
+{
+  proxylog("WSAAsyncSelect: socket: %u HWND: %p, wMsg: %u, lEvent: %ld\n", s, hWnd, wMsg, lEvent);
+
+  release_assert(wMsg);
+
+  sockaddr_in sourceSockName = {};
+  int size = sizeof(sockaddr_in);
+  getsockname(s, (sockaddr*)&sourceSockName, &size);
+  release_assert(sourceSockName.sin_port);
+
+  std::scoped_lock lock(this->mutex);
+
+  SocketData& socketData = getOrCreateSocketData(s);
+  socketData.isAsyncSelectRegistered = true;
+  socketData.asyncSelectHWnd = hWnd;
+  socketData.asyncSelectWMsg = wMsg;
+  socketData.asyncSelectLEvent = lEvent;
+
+  socketData.sendWriteEvent();
+
+  WSASetLastError(0);
+  return 0;
+}
+
+int Proxy::connect_override(SOCKET s, const struct sockaddr* name, int namelen)
+{
+  int type = 0;
+  int length = sizeof(int);
+  getsockopt(s, SOL_SOCKET, SO_TYPE, (char*)&type, &length);
+
+  if (type != SOCK_DGRAM)
+    return this->connect_orig(s, name, namelen);
+
+  std::scoped_lock lock(this->mutex);
+
+  proxylog("Proxy::connect_override: socket: %u name: %s\n", s, sockaddrToString(name).c_str());
+
+  release_assert(name->sa_family == AF_INET);
+  this->getOrCreateSocketData(s).connectAddr = *((sockaddr_in*)name);
+
+  WSASetLastError(0);
+  return 0;
+}
+
+int Proxy::send_override(SOCKET s, const char* buf, int len, int flags)
+{
+  int type = 0;
+  int length = sizeof(int);
+  getsockopt(s, SOL_SOCKET, SO_TYPE, (char*)&type, &length);
+
+  if (type != SOCK_DGRAM)
+    return this->send_orig(s, buf, len, flags);
+
+  sockaddr_in destination;
+  {
+    std::scoped_lock lock(this->mutex);
+    SocketData* socketData = this->tryGetSocketData(s);
+    release_assert(socketData);
+    destination = *socketData->connectAddr;
+  }
+
+  proxylog("Proxy::send_override: socket: %u, len: %d, flags: %d\n", s, len, flags);
+  return this->sendto_override(s, buf, len, flags, (sockaddr*)&destination, sizeof(sockaddr_in));
+}
+
+int Proxy::recv_override(SOCKET s, char* buf, int len, int flags)
+{
+  int type = 0;
+  int length = sizeof(int);
+  getsockopt(s, SOL_SOCKET, SO_TYPE, (char*)&type, &length);
+
+  if (type != SOCK_DGRAM)
+    return this->recv_orig(s, buf, len, flags);
+
+  sockaddr_in connectAddr;
+  {
+    std::scoped_lock lock(this->mutex);
+    SocketData* socketData = this->tryGetSocketData(s);
+    release_assert(socketData);
+    connectAddr = *socketData->connectAddr;
+  }
+
+  proxylog("Proxy::recv_override: socket: %u, len: %d, flags: %d\n", s, len, flags);
+
+  sockaddr_in from = {};
+  int fromLen = sizeof(sockaddr_in);
+
+  int ret = this->recvfrom_override(s, buf, len, flags, (sockaddr*)&from, &fromLen);
+  // TODO: check that connectAddr matches here?
+  return ret;
+}
+
 int Proxy::forwardSend(SOCKET s, const char* buf, int len, int flags, const struct sockaddr* to, int tolen, SOCKET forwardSock, sockaddr_in& forwardTo)
 {
-
   constexpr int newPacketBuffSize = 5000;
   uint8_t newPacketBuff[newPacketBuffSize];
 
@@ -153,7 +327,12 @@ int Proxy::forwardSend(SOCKET s, const char* buf, int len, int flags, const stru
 
   header->crc = CRC::Calculate(newPacketBuff + 4, finalPacketLen - 4, CRC::CRC_32());
 
-  return this->sendto_orig(forwardSock, (const char*)newPacketBuff, finalPacketLen, 0, (sockaddr*)&forwardTo, sizeof(sockaddr_in));
+  int retval = this->sendto_orig(forwardSock, (const char*)newPacketBuff, finalPacketLen, 0, (sockaddr*)&forwardTo, sizeof(sockaddr_in));
+  if (retval == SOCKET_ERROR)
+    return retval;
+
+  release_assert(retval == finalPacketLen);
+  return finalPacketLen - sizeof(ForwardedPacketHeader);
 }
 
 
@@ -241,6 +420,18 @@ void ProxyServer::run()
     newPacket.originalFrom = from4;
     newPacket.originalFrom.sin_port = htons(header->originalSourcePortH);
     newPacket.originalTo = header->originalTo;
+
+
+    for (SocketData& socketData : this->sockets)
+    {
+      if (socketData.isAsyncSelectRegistered &&
+        socketData.bindAddr.has_value() &&
+        ntohs(socketData.bindAddr->sin_port) == destPortH &&
+        !socketData.readEventSent)
+      {
+        socketData.sendReadEvent();
+      }
+    }
   }
 }
 

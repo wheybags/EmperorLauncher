@@ -275,23 +275,24 @@ int __fastcall CNetworkAdmin_setFrameLimitPatched(CNetworkAdmin* This, DWORD edx
 
   if (isServer)
   {
-    CNetworkAdmin_setFrameLimitFromGlobalSettings(This);
+    //CNetworkAdmin_setFrameLimitFromGlobalSettings(This);
+    //
+    //if (value > This->frameLimit)
+    //  return This->frameLimit;
 
-    if (value > This->frameLimit)
-      return This->frameLimit;
+    // just hardcode speed 6 for now, seems like calling CNetworkAdmin_setFrameLimitFromGlobalSettings is
+    // causing memory corruption during initialisation of WOL games
+    if (value > 25)
+      value = 25;
   }
 
   This->frameLimit = value;
   return This->frameLimit;
 }
 
-
 // skips the attempt to use port mangling
 void CMangler_Pattern_QueryPatched()
 {
-
-  //bool* IsPortManglerPtr = (bool*)0x00B7E7B0;
-  //Log("AAAAAAAAAAAAAAAAAAAAAAAAA %d\n", int(*IsPortManglerPtr));
   return;
 }
 
@@ -306,6 +307,15 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOI
   {
     DWORD size = sizeof(DWORD);
     HRESULT result = RegGetValueA(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\LauncherCustomSettings", "DoFullscreen", RRF_RT_REG_DWORD, nullptr, &emperorLauncherDoFullscreen, &size);
+
+    std::string serverAddress;
+    {
+      DWORD buffSize = 1024;
+      char buff[1024];
+      HRESULT result = RegGetValueA(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\LauncherCustomSettings", "ServerAddress", RRF_RT_REG_SZ, nullptr, &buff, &buffSize);
+      release_assert(SUCCEEDED(result));
+      serverAddress = buff;
+    }
 
     DetourRestoreAfterWith();
 
