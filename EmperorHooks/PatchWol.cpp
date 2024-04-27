@@ -4,7 +4,7 @@
 #include <memory>
 #include <detours.h>
 #include "Log.hpp"
-#include "GamePacketProxy.hpp"
+#include "PatchWol.hpp"
 #include <thread>
 #include <vector>
 #include <map>
@@ -12,6 +12,8 @@
 #include <queue>
 #include "CRC.hpp"
 #include <optional>
+#include "GameExeImports.hpp"
+#include "PatchDebugLog.hpp"
 
 
 #define proxylog(format, ...) Log("\033[32m" format "\033[0m", __VA_ARGS__)
@@ -546,8 +548,53 @@ int ProxyClient::sendto_override(SOCKET s, const char* buf, int len, int flags, 
   return this->forwardSend(s, buf, len, flags, to, tolen, this->sock, this->serverAddr);
 }
 
+// This patch forces the in game speed setting to apply to multiplayer games. Unpatched, the game will simply run as fast as the
+// slowest client. The game does some calculation to determine what frame limit to use depending on the speed of all the other
+// clients, then sets it by calling CNetworkAdmin::setFrameLimit (this function). We override this function, and make sure that
+// the frame limit is never set higher than the current speed setting, but we only apply this limitation on the host. The other
+// clients in the game will automatically adjust their speed to match the speed limited host.
+// original is __thiscall, but we can't declare a thiscall func outside a class, so we fake it with fastcall and an unused edx param
+PFN_CNetworkAdmin_setFrameLimit CNetworkAdmin_setFrameLimitOrig = CNetworkAdmin_setFrameLimit;
+int __fastcall CNetworkAdmin_setFrameLimitPatched(CNetworkAdmin* This, DWORD edx, int value)
+{
+  // This isn't perfect, it is not set until a while after starting the game. Also it won't get reset if you
+  // play single player after an mp game. Luckily, it doesn't seem to matter if we do or don't force the
+  // frame limit in an sp game, so in practice it works well enough for our purposes.
+  bool isServer = networkTypeDerivedFromLogOutput == NetworkFromLogType::Server;
+
+  if (isServer)
+  {
+    //CNetworkAdmin_setFrameLimitFromGlobalSettings(This);
+    //
+    //if (value > This->frameLimit)
+    //  return This->frameLimit;
+
+    // just hardcode speed 6 for now, seems like calling CNetworkAdmin_setFrameLimitFromGlobalSettings is
+    // causing memory corruption during initialisation of WOL games
+    if (value > 25)
+      value = 25;
+  }
+
+  This->frameLimit = value;
+  return This->frameLimit;
+}
+
+// skips the attempt to use port mangling
+PFN_CMangler_Pattern_Query CMangler_Pattern_Query_Orig = CMangler_Pattern_Query;
+void CMangler_Pattern_Query_Patched()
+{
+  return;
+}
+
+
 void init(std::unique_ptr<Proxy> proxy)
 {
+  DetourTransactionBegin();
+  DetourUpdateThread(GetCurrentThread());
+  DetourAttach(&(PVOID&)CNetworkAdmin_setFrameLimitOrig, CNetworkAdmin_setFrameLimitPatched);
+  DetourAttach(&(PVOID&)CMangler_Pattern_Query_Orig, CMangler_Pattern_Query_Patched);
+  DetourTransactionCommit();
+
   proxy->installHooks();
 
   WSAData wSAData = {};
@@ -562,13 +609,13 @@ void init(std::unique_ptr<Proxy> proxy)
 }
 
 
-void installProxyServer()
+void patchWolAsServer()
 {
   proxylog("initialising as server\n");
   init(std::unique_ptr<Proxy>(new ProxyServer()));
 }
 
-void installProxyClient(const std::string& serverAddr)
+void patchWolAsClient(const std::string& serverAddr)
 {
   proxylog("initialising as client, connecting to: %s\n", serverAddr.c_str());
   init(std::unique_ptr<Proxy>(new ProxyClient(serverAddr)));

@@ -20,7 +20,6 @@ struct SomeNetworkThing
   DWORD unk[7];
 };
 
-
 struct CNetworkAdmin
 {
   IpAndPort ipAndPort;
@@ -43,39 +42,52 @@ struct CNetworkAdmin
   DWORD unk4[66];
 };
 
-extern void (*sub_477250)();
-extern unsigned __int8(__thiscall* sub_4D66F0)(GlobalStuff* This);
-extern int(__fastcall* sub_477170)(int a1);
-extern void(__thiscall* GlobalStuff_someSetter)(GlobalStuff* This);
-extern int (__thiscall* sub_5473C0)(DWORD* This, const char* a2, const char* a3);
-extern void(__thiscall* resetDevice)(GraphicsContext* This);
-extern int(__thiscall* CNetworkAdmin_setFrameLimitFromGlobalSettings)(CNetworkAdmin* This);
 
-extern char* (__thiscall *ResourceManager_GetResourceStringOrig)(int* This, const char* name);
-extern size_t (__cdecl* setupSoundCdPathsOrig)(const char* driveLetterPath, int cdIndex);
-extern char (__cdecl* doCdCheckOrig)(int cdIndex, char a2);
-extern char (__cdecl* regSettingsOpenHkeyOrig)(char* fullPath, int createKey);
-extern int(__thiscall* SomeNetworkManager_SendLobbyMessageOrig)(SomeNetworkManager* This, __int16 a2, int a3, wchar_t* message, char a5);
-extern int(__stdcall* wndProcDuneIIIOrig)(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam);
-extern int(__thiscall* CNetworkAdmin_setFrameLimitOrig)(CNetworkAdmin* This, int value);
-extern u_short(*CPortUtil_Get_Free_Random_Port_HOrig)();
-extern bool(__cdecl* testPort)(u_short hostshort);
-extern void(__cdecl* CPortUtil_Set_Port_RangeOrig)(unsigned __int16 port_h_min, unsigned __int16 port_h_max);
-extern void(*CMangler_Pattern_QueryOrig)();
-extern void(__cdecl* sendPortRangeUpdatePacketOrig)(void* p_user, int Id, unsigned __int16 port_h_min, unsigned __int16 port_h_max);
-extern int(__stdcall* WinMainOrig)(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd);
+typedef size_t(__cdecl* PFN_setupSoundCdPaths)(const char* driveLetterPath, int cdIndex);
+typedef void(__cdecl* PFN_sub_477250)();
+typedef unsigned __int8(__thiscall* PFN_sub_4D66F0)(GlobalStuff* This);
+typedef int(__fastcall* PFN_sub_477170)(int a1);
+typedef void(__thiscall* PFN_GlobalStuff_someSetter)(GlobalStuff* This);
+typedef int(__thiscall* PFN_sub_5473C0)(DWORD* This, const char* a2, const char* a3);
+typedef void(__thiscall* PFN_resetDevice)(GraphicsContext* This); // note: maybe wrong signature
+typedef int(__thiscall* PFN_CNetworkAdmin_setFrameLimitFromGlobalSettings)(CNetworkAdmin* This);
+typedef char* (__thiscall* PFN_ResourceManager_GetResourceStringOrig)(int* resourceManager, const char* name);
+typedef char(__cdecl* PFN_doCdCheck)(int cdIndex, char a2);
+typedef char(__cdecl* PFN_regSettingsOpenHkey)(char* fullPath, int createKey);
+typedef int(__thiscall* PFN_SomeNetworkManager_SendLobbyMessage)(SomeNetworkManager* This, __int16 a2, int a3, wchar_t* message, char a5);
+typedef int(__stdcall* PFN_wndProcDuneIII)(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam);
+typedef BOOL(__cdecl* PFN_setWindowStyleAndDrainMessages)(HWND hWnd, int width, int height, char windowedMode);
+typedef int(__thiscall* PFN_CNetworkAdmin_setFrameLimit)(CNetworkAdmin* This, int value);
+typedef void(*PFN_CMangler_Pattern_Query)();
+typedef int(__stdcall* PFN_WinMain)(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd);
 
-extern DWORD* dword_B7D098P;
 
-extern int** resourceManagerP;
-extern HWND* const mainWindowHandleP;
-extern uint8_t* gDoQuitP;
-extern char** currentCdDataPathP;
-extern int* somethingThatControlsExitingCdCheckLoopP;
+#define setupSoundCdPaths ((PFN_setupSoundCdPaths)0x00477220)
+#define sub_477250 ((PFN_sub_477250)0x477250)
+#define sub_4D66F0 ((PFN_sub_4D66F0)0x4D66F0)
+#define sub_477170 ((PFN_sub_477170)0x00477170)
+#define GlobalStuff_someSetter ((PFN_GlobalStuff_someSetter)0x4D7230)
+#define sub_5473C0 ((PFN_sub_5473C0)0x5473C0)
+#define resetDevice ((PFN_resetDevice)0x00407F20)
+#define CNetworkAdmin_setFrameLimitFromGlobalSettings ((PFN_CNetworkAdmin_setFrameLimitFromGlobalSettings)0x00509990)
+#define ResourceManager_GetResourceString ((PFN_ResourceManager_GetResourceStringOrig)0x00405A50)
+#define doCdCheck ((PFN_doCdCheck)0x00496580)
+#define regSettingsOpenHkey ((PFN_regSettingsOpenHkey)0x0051E0E0)
+#define SomeNetworkManager_SendLobbyMessage ((PFN_SomeNetworkManager_SendLobbyMessage)0x004D96A0)
+#define wndProcDuneIII ((PFN_wndProcDuneIII)0x004A6560)
+#define setWindowStyleAndDrainMessages ((PFN_setWindowStyleAndDrainMessages)0x004A7260)
+#define CNetworkAdmin_setFrameLimit ((PFN_CNetworkAdmin_setFrameLimit)0x00406220)
+#define CMangler_Pattern_Query ((PFN_CMangler_Pattern_Query)0x005AC370)
+#define GameExeWinMain ((PFN_WinMain)0x004A73D0)
 
 
 #define IMP(type, address) (*((type*)address))
-
+#define somethingThatControlsExitingCdCheckLoop IMP(int, 0x007CBC68)
+#define currentCdDataPath IMP(char*, 0x007CBC50)
+#define gDoQuit IMP(uint8_t, 0x007D75AC)
+#define mainWindowHandle IMP(HWND, 0x007D75A8)
+#define pResourceManager IMP(int*, 0x007D75B8)
+#define dword_B7D098 IMP(DWORD, 0xB7D098)
 #define dword_7CB9D4 IMP(DWORD, 0x7CB9D4)
 #define dword_818458 IMP(DWORD, 0x818458)
 #define dword_81845C IMP(DWORD, 0x81845C)

@@ -96,7 +96,7 @@ HRESULT WINAPI MyDirectDrawCreateEx(GUID FAR* lpGuid, LPVOID* lplpDD, REFIID iid
 
     if (OriginalPointer_IDirect3D7_CreateDevice)
       release_assert(direct3D->lpVtbl->CreateDevice == OriginalPointer_IDirect3D7_CreateDevice);
-    
+
     if (direct3D && Real_IDirect3D7_CreateDevice == nullptr)
     {
       Real_IDirect3D7_CreateDevice = direct3D->lpVtbl->CreateDevice;
@@ -121,5 +121,8 @@ void HookD3D7()
   HMODULE ddraw = LoadLibraryA("DDRAW.DLL");
   RealDirectDrawCreateEx = (HRESULT(WINAPI*)(GUID FAR*, LPVOID*, REFIID, IUnknown FAR*)) GetProcAddress(ddraw, "DirectDrawCreateEx");
 
+  DetourTransactionBegin();
+  DetourUpdateThread(GetCurrentThread());
   DetourAttach(&(PVOID&)RealDirectDrawCreateEx, MyDirectDrawCreateEx);
+  DetourTransactionCommit();
 }

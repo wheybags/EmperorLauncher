@@ -5,6 +5,7 @@
 #include <string>
 #include <filesystem>
 #include "Log.hpp"
+#include <detours.h>
 
 
 static char* __cdecl copyWstrToStrSimple(char* dest, wchar_t* src)
@@ -33,7 +34,9 @@ static bool isPathADiskRoot(const char* driveLetterPath)
   return strlen(driveLetterPath) == 3 && isalpha(driveLetterPath[0]) && driveLetterPath[1] == ':' && driveLetterPath[2] == '\\';
 }
 
-char __cdecl doCdCheckPatched(int cdIndex, char a2)
+
+static PFN_doCdCheck doCdCheckOrig = doCdCheck;
+static char __cdecl doCdCheckPatched(int cdIndex, char a2)
 {
   if (!cdIndex)
     return 1;
@@ -51,16 +54,16 @@ char __cdecl doCdCheckPatched(int cdIndex, char a2)
       switch (cdIndex - 1)
       {
         case 0:
-          someCdDataObj = sub_5473C0(dword_B7D098P, "CDCheck", "InstallLabel");
+          someCdDataObj = sub_5473C0(&dword_B7D098, "CDCheck", "InstallLabel");
           goto LABEL_27;
         case 1:
-          someCdDataObj = sub_5473C0(dword_B7D098P, "CDCheck", "ATLabel");
+          someCdDataObj = sub_5473C0(&dword_B7D098, "CDCheck", "ATLabel");
           goto LABEL_27;
         case 3:
-          someCdDataObj = sub_5473C0(dword_B7D098P, "CDCheck", "HKLabel");
+          someCdDataObj = sub_5473C0(&dword_B7D098, "CDCheck", "HKLabel");
           goto LABEL_27;
         case 7:
-          someCdDataObj = sub_5473C0(dword_B7D098P, "CDCheck", "ORLabel");
+          someCdDataObj = sub_5473C0(&dword_B7D098, "CDCheck", "ORLabel");
         LABEL_27:
           break;
         default:
@@ -84,7 +87,7 @@ char __cdecl doCdCheckPatched(int cdIndex, char a2)
         case 8:
           cdResourceName = "CD4";
         LABEL_14:
-          driveLetterPath = ResourceManager_GetResourceStringOrig(*resourceManagerP, cdResourceName);
+          driveLetterPath = ResourceManager_GetResourceString(pResourceManager, cdResourceName);
           break;
         default:
           driveLetterPath = nullptr;
@@ -126,19 +129,19 @@ char __cdecl doCdCheckPatched(int cdIndex, char a2)
         switch (cdIndex - 1)
         {
           case 0:
-            setupSoundCdPathsOrig(driveLetterPath, 1);
+            setupSoundCdPaths(driveLetterPath, 1);
             return 1;
           case 1:
-            setupSoundCdPathsOrig(driveLetterPath, 2);
+            setupSoundCdPaths(driveLetterPath, 2);
             return 1;
           case 3:
-            setupSoundCdPathsOrig(driveLetterPath, 3);
+            setupSoundCdPaths(driveLetterPath, 3);
             return 1;
           case 7:
-            setupSoundCdPathsOrig(driveLetterPath, 4);
+            setupSoundCdPaths(driveLetterPath, 4);
             return 1;
           default:
-            setupSoundCdPathsOrig(driveLetterPath, 0);
+            setupSoundCdPaths(driveLetterPath, 0);
             return 1;
         }
       }
@@ -151,17 +154,17 @@ char __cdecl doCdCheckPatched(int cdIndex, char a2)
   // non-campaign game, any game CD will do
   else
   {
-    for (int i = 0; i < *somethingThatControlsExitingCdCheckLoopP; i++)
+    for (int i = 0; i < somethingThatControlsExitingCdCheckLoop; i++)
     {
       bool ok = true;
-      if (isPathADiskRoot(*currentCdDataPathP))
+      if (isPathADiskRoot(currentCdDataPath))
       {
         CHAR VolumeNameBuffer[512];
-        if (GetVolumeInformationA(*currentCdDataPathP, VolumeNameBuffer, sizeof(VolumeNameBuffer), 0, 0, 0, 0, 0))
+        if (GetVolumeInformationA(currentCdDataPath, VolumeNameBuffer, sizeof(VolumeNameBuffer), 0, 0, 0, 0, 0))
         {
           bool isAtreidesDisk = false;
           {
-            int someObj = sub_5473C0(dword_B7D098P, "CDCheck", "ATLabel");
+            int someObj = sub_5473C0(&dword_B7D098, "CDCheck", "ATLabel");
             wchar_t* desiredVolumeName = *(wchar_t**)(someObj + 32);
             size_t len = wcslen(desiredVolumeName);
 
@@ -172,7 +175,7 @@ char __cdecl doCdCheckPatched(int cdIndex, char a2)
 
           bool isHarkonnenDisk = false;
           {
-            int someObj = sub_5473C0(dword_B7D098P, "CDCheck", "HKLabel");
+            int someObj = sub_5473C0(&dword_B7D098, "CDCheck", "HKLabel");
             wchar_t* desiredVolumeName = *(wchar_t**)(someObj + 32);
             size_t len = wcslen(desiredVolumeName);
 
@@ -183,7 +186,7 @@ char __cdecl doCdCheckPatched(int cdIndex, char a2)
 
           bool isOrdosDisk = false;
           {
-            int someObj = sub_5473C0(dword_B7D098P, "CDCheck", "ORLabel");
+            int someObj = sub_5473C0(&dword_B7D098, "CDCheck", "ORLabel");
             wchar_t* desiredVolumeName = *(wchar_t**)(someObj + 32);
             size_t len = wcslen(desiredVolumeName);
 
@@ -194,7 +197,7 @@ char __cdecl doCdCheckPatched(int cdIndex, char a2)
 
           bool isInstallDisk = false;
           {
-            int someObj = sub_5473C0(dword_B7D098P, "CDCheck", "InstallLabel");
+            int someObj = sub_5473C0(&dword_B7D098, "CDCheck", "InstallLabel");
             wchar_t* desiredVolumeName = *(wchar_t**)(someObj + 32);
             size_t len = wcslen(desiredVolumeName);
 
@@ -212,13 +215,13 @@ char __cdecl doCdCheckPatched(int cdIndex, char a2)
       }
       else
       {
-        ok = std::filesystem::exists(std::filesystem::path(*currentCdDataPathP) / "MUSIC.BAG") || 
-             std::filesystem::exists(std::filesystem::path(*currentCdDataPathP) / "INSTALL" / "DATA" / "MUSIC" / "music.bag");
+        ok = std::filesystem::exists(std::filesystem::path(currentCdDataPath) / "MUSIC.BAG") ||
+             std::filesystem::exists(std::filesystem::path(currentCdDataPath) / "INSTALL" / "DATA" / "MUSIC" / "music.bag");
       }
 
       if (ok)
       {
-        setupSoundCdPathsOrig(*currentCdDataPathP, 0);
+        setupSoundCdPaths(currentCdDataPath, 0);
         return 1;
       }
 
@@ -227,4 +230,12 @@ char __cdecl doCdCheckPatched(int cdIndex, char a2)
   }
 
   return 0;
+}
+
+void patchCdCheck()
+{
+  DetourTransactionBegin();
+  DetourUpdateThread(GetCurrentThread());
+  DetourAttach(&(PVOID&)doCdCheckOrig, doCdCheckPatched);
+  DetourTransactionCommit();
 }

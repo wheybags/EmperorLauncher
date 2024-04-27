@@ -1692,6 +1692,9 @@ void patchDebugLog()
   }
 
   // These detours attach to the two new functions we just created
+  DetourTransactionBegin();
+  DetourUpdateThread(GetCurrentThread());
   DetourAttach(&(PVOID&)GameExeLog, LogPatched);
   DetourAttach(&(PVOID&)GameExeLog2, Log2Patched);
+  DetourTransactionCommit();
 }

@@ -38,10 +38,6 @@
     <ClInclude Include="PatchSettings.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="PatchLan.hpp">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="PatchWndProcDuneIII.hpp" />
     <ClInclude Include="WrapWinsock.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -51,10 +47,13 @@
     <ClInclude Include="WinsockApi.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="GamePacketProxy.hpp">
+    <ClInclude Include="PatchWol.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="CRC.hpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PatchWindowManagement.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -74,19 +73,13 @@
     <ClCompile Include="DoCdCheck.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="GameExeImports.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="PatchDebugLog.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="PatchSettings.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="PatchLan.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="PatchWndProcDuneIII.cpp">
+    <ClCompile Include="PatchWindowManagement.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="WrapWinsock.cpp">
@@ -98,7 +91,7 @@
     <ClCompile Include="WinsockApi.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="GamePacketProxy.cpp">
+    <ClCompile Include="PatchWol.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
