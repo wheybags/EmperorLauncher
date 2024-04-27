@@ -31,12 +31,20 @@ VOID(WINAPI* OutputDebugStringWReal) (_In_opt_ LPCWSTR lpOutputString) = OutputD
 
 VOID WINAPI OutputDebugStringAWrap(_In_opt_ LPCSTR lpOutputString)
 {
+  // intel gpu drivers spam this for some reason
+  if (lpOutputString && strncmp(lpOutputString, "Peiran message result", 21) == 0)
+    return;
+
   Log("OutputDebugStringA: %s", lpOutputString);
   OutputDebugStringAReal(lpOutputString);
 }
 
 VOID WINAPI OutputDebugStringWWrap(_In_opt_ LPCWSTR lpOutputString)
 {
+  // intel gpu drivers spam this for some reason
+  if (lpOutputString && wcsncmp(lpOutputString, L"Peiran message result", 21) == 0)
+    return;
+
   Log("OutputDebugStringW: %S", lpOutputString);
   OutputDebugStringWReal(lpOutputString);
 }
