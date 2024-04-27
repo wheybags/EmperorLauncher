@@ -41,16 +41,24 @@ struct ForwardedPacketHeader
   PacketType type;
 };
 
+class Proxy;
+static Proxy* staticProxy = nullptr;
+
+static PFN_sendto sendto_orig = nullptr;
+static PFN_recvfrom recvfrom_orig = nullptr;
+static PFN_WSAAsyncSelect WSAAsyncSelect_orig = nullptr;
+static PFN_connect connect_orig = nullptr;
+static PFN_send send_orig = nullptr;
+static PFN_recv recv_orig = nullptr;
+
+
 class Proxy
 {
 public:
-  void installHooks();
   virtual void initialise() = 0;
   virtual void run() = 0;
 
-protected:
-  virtual int forwardSend(SOCKET s, const char* buf, int len, int flags, const struct sockaddr* to, int tolen, SOCKET forwardSock, sockaddr_in& forwardTo);
-
+public:
   virtual int sendto_override(SOCKET s, const char* buf, int len, int flags, const struct sockaddr* to, int tolen) = 0;
   int recvfrom_override(SOCKET s, char* buf, int len, int flags, struct sockaddr* from, int* fromlen);
   int WSAAsyncSelect_override(SOCKET s, HWND hWnd, u_int wMsg, long lEvent);
@@ -58,20 +66,8 @@ protected:
   int send_override(SOCKET s, const char* buf, int len, int flags);
   int recv_override(SOCKET s, char* buf, int len, int flags);
 
-  PFN_sendto sendto_orig = nullptr;
-  PFN_recvfrom recvfrom_orig = nullptr;
-  PFN_WSAAsyncSelect WSAAsyncSelect_orig = nullptr;
-  PFN_connect connect_orig = nullptr;
-  PFN_send send_orig = nullptr;
-  PFN_recv recv_orig = nullptr;
-
-  static Proxy* staticProxy;
-  static int PASCAL sendto_override_static(SOCKET s, const char* buf, int len, int flags, const struct sockaddr* to, int tolen) { return staticProxy->sendto_override(s, buf, len, flags, to, tolen); }
-  static int PASCAL recvfrom_override_static(SOCKET s, char* buf, int len, int flags, struct sockaddr* from, int* fromlen) { return staticProxy->recvfrom_override(s, buf, len, flags, from, fromlen); }
-  static int PASCAL WSAAsyncSelect_override_static(SOCKET s, HWND hWnd, u_int wMsg, long lEvent) { return staticProxy->WSAAsyncSelect_override(s, hWnd, wMsg, lEvent); }
-  static int PASCAL connect_override_static(SOCKET s, const struct sockaddr* name, int namelen) { return staticProxy->connect_override(s, name, namelen); }
-  static int PASCAL send_override_static(SOCKET s, const char* buf, int len, int flags) { return staticProxy->send_override(s, buf, len, flags); }
-  static int PASCAL recv_override_static(SOCKET s, char* buf, int len, int flags) { return staticProxy->recv_override(s, buf, len, flags); }
+protected:
+  virtual int forwardSend(SOCKET s, const char* buf, int len, int flags, const struct sockaddr* to, int tolen, SOCKET forwardSock, sockaddr_in& forwardTo);
 
   std::mutex mutex;
   std::map<u_short, std::queue<ReceivedPacket>> receivedPacketsByPort;
@@ -130,34 +126,6 @@ protected:
     return retval;
   }
 };
-
-Proxy* Proxy::staticProxy = nullptr;
-
-void Proxy::installHooks()
-{
-  staticProxy = this;
-
-  HMODULE wsock = LoadLibraryA("wsock32.dll");
-
-  sendto_orig = (PFN_sendto)GetProcAddress(wsock, "sendto");
-  recvfrom_orig = (PFN_recvfrom)GetProcAddress(wsock, "recvfrom");
-  WSAAsyncSelect_orig = (PFN_WSAAsyncSelect)GetProcAddress(wsock, "WSAAsyncSelect");
-  connect_orig = (PFN_connect)GetProcAddress(wsock, "connect");
-  send_orig = (PFN_send)GetProcAddress(wsock, "send");
-  recv_orig = (PFN_recv)GetProcAddress(wsock, "recv");
-
-  DetourTransactionBegin();
-  DetourUpdateThread(GetCurrentThread());
-
-  DetourAttach(&(PVOID&)sendto_orig, sendto_override_static);
-  DetourAttach(&(PVOID&)recvfrom_orig, recvfrom_override_static);
-  DetourAttach(&(PVOID&)WSAAsyncSelect_orig, WSAAsyncSelect_override_static);
-  DetourAttach(&(PVOID&)connect_orig, connect_override_static);
-  DetourAttach(&(PVOID&)send_orig, send_override_static);
-  DetourAttach(&(PVOID&)recv_orig, recv_override_static);
-
-  DetourTransactionCommit();
-}
 
 int Proxy::recvfrom_override(SOCKET s, char* buf, int len, int flags, struct sockaddr* from, int* fromlen)
 {
@@ -240,7 +208,7 @@ int Proxy::connect_override(SOCKET s, const struct sockaddr* name, int namelen)
   getsockopt(s, SOL_SOCKET, SO_TYPE, (char*)&type, &length);
 
   if (type != SOCK_DGRAM)
-    return this->connect_orig(s, name, namelen);
+    return connect_orig(s, name, namelen);
 
   std::scoped_lock lock(this->mutex);
 
@@ -260,7 +228,7 @@ int Proxy::send_override(SOCKET s, const char* buf, int len, int flags)
   getsockopt(s, SOL_SOCKET, SO_TYPE, (char*)&type, &length);
 
   if (type != SOCK_DGRAM)
-    return this->send_orig(s, buf, len, flags);
+    return send_orig(s, buf, len, flags);
 
   sockaddr_in destination;
   {
@@ -281,7 +249,7 @@ int Proxy::recv_override(SOCKET s, char* buf, int len, int flags)
   getsockopt(s, SOL_SOCKET, SO_TYPE, (char*)&type, &length);
 
   if (type != SOCK_DGRAM)
-    return this->recv_orig(s, buf, len, flags);
+    return recv_orig(s, buf, len, flags);
 
   sockaddr_in connectAddr;
   {
@@ -329,7 +297,7 @@ int Proxy::forwardSend(SOCKET s, const char* buf, int len, int flags, const stru
 
   header->crc = CRC::Calculate(newPacketBuff + 4, finalPacketLen - 4, CRC::CRC_32());
 
-  int retval = this->sendto_orig(forwardSock, (const char*)newPacketBuff, finalPacketLen, 0, (sockaddr*)&forwardTo, sizeof(sockaddr_in));
+  int retval = sendto_orig(forwardSock, (const char*)newPacketBuff, finalPacketLen, 0, (sockaddr*)&forwardTo, sizeof(sockaddr_in));
   if (retval == SOCKET_ERROR)
     return retval;
 
@@ -444,7 +412,7 @@ void ProxyServer::sendKeepaliveLoop()
     ForwardedPacketHeader keepalivePacket = {};
     keepalivePacket.type = PacketType::KeepAlive;
     keepalivePacket.crc = CRC::Calculate(&keepalivePacket + 4, sizeof(ForwardedPacketHeader) - 4, CRC::CRC_32());
-    this->sendto_orig(this->sock, (const char*)&keepalivePacket, sizeof(ForwardedPacketHeader), 0, (sockaddr*)&this->replyAddr, sizeof(this->replyAddr));
+    sendto_orig(this->sock, (const char*)&keepalivePacket, sizeof(ForwardedPacketHeader), 0, (sockaddr*)&this->replyAddr, sizeof(this->replyAddr));
 
     Sleep(1000 * 10);
   }
@@ -491,7 +459,7 @@ void ProxyClient::sendKeepaliveLoop()
     ForwardedPacketHeader keepalivePacket = {};
     keepalivePacket.type = PacketType::KeepAlive;
     keepalivePacket.crc = CRC::Calculate(((uint8_t*)&keepalivePacket) + 4, sizeof(ForwardedPacketHeader) - 4, CRC::CRC_32());
-    this->sendto_orig(this->sock, (const char*)&keepalivePacket, sizeof(ForwardedPacketHeader), 0, (sockaddr*)&this->serverAddr, sizeof(this->serverAddr));
+    sendto_orig(this->sock, (const char*)&keepalivePacket, sizeof(ForwardedPacketHeader), 0, (sockaddr*)&this->serverAddr, sizeof(this->serverAddr));
 
     Sleep(1000 * 10);
   }
@@ -564,15 +532,38 @@ int __fastcall CNetworkAdmin_setFrameLimitPatched(CNetworkAdmin* This, DWORD edx
 
   if (isServer)
   {
-    //CNetworkAdmin_setFrameLimitFromGlobalSettings(This);
-    //
-    //if (value > This->frameLimit)
-    //  return This->frameLimit;
+    // This switch is mostly copied from CNetworkAdmin_setFrameLimitFromGlobalSettings(This), but without a special case check
+    // that seems to cause crashes when we use it from an unexpected place like this
+    int maxFrameLimit = 0;
+    switch (GameOptions_getGameSpeed(&someGlobalThing.optionsStorage->gameOptions))
+    {
+    case 1u:
+      maxFrameLimit = 8;
+      break;
+    case 2u:
+      maxFrameLimit = 10;
+      break;
+    case 3u:
+      maxFrameLimit = 12;
+      break;
+    case 4u:
+      maxFrameLimit = 15;
+      break;
+    case 5u:
+      maxFrameLimit = 20;
+    case 6u:
+      maxFrameLimit = 25;
+      break;
+    case 7u:
+      maxFrameLimit = 30;
+      break;
+    default:
+      maxFrameLimit = -1;
+      break;
+    }
 
-    // just hardcode speed 6 for now, seems like calling CNetworkAdmin_setFrameLimitFromGlobalSettings is
-    // causing memory corruption during initialisation of WOL games
-    if (value > 25)
-      value = 25;
+    if (value > maxFrameLimit)
+      value = maxFrameLimit;
   }
 
   This->frameLimit = value;
@@ -586,25 +577,47 @@ void CMangler_Pattern_Query_Patched()
   return;
 }
 
+static int PASCAL sendto_override_static(SOCKET s, const char* buf, int len, int flags, const struct sockaddr* to, int tolen) { return staticProxy->sendto_override(s, buf, len, flags, to, tolen); }
+static int PASCAL recvfrom_override_static(SOCKET s, char* buf, int len, int flags, struct sockaddr* from, int* fromlen) { return staticProxy->recvfrom_override(s, buf, len, flags, from, fromlen); }
+static int PASCAL WSAAsyncSelect_override_static(SOCKET s, HWND hWnd, u_int wMsg, long lEvent) { return staticProxy->WSAAsyncSelect_override(s, hWnd, wMsg, lEvent); }
+static int PASCAL connect_override_static(SOCKET s, const struct sockaddr* name, int namelen) { return staticProxy->connect_override(s, name, namelen); }
+static int PASCAL send_override_static(SOCKET s, const char* buf, int len, int flags) { return staticProxy->send_override(s, buf, len, flags); }
+static int PASCAL recv_override_static(SOCKET s, char* buf, int len, int flags) { return staticProxy->recv_override(s, buf, len, flags); }
 
-void init(std::unique_ptr<Proxy> proxy)
+
+void init(Proxy* proxy)
 {
+  HMODULE wsock = LoadLibraryA("wsock32.dll");
+
+  sendto_orig = (PFN_sendto)GetProcAddress(wsock, "sendto");
+  recvfrom_orig = (PFN_recvfrom)GetProcAddress(wsock, "recvfrom");
+  WSAAsyncSelect_orig = (PFN_WSAAsyncSelect)GetProcAddress(wsock, "WSAAsyncSelect");
+  connect_orig = (PFN_connect)GetProcAddress(wsock, "connect");
+  send_orig = (PFN_send)GetProcAddress(wsock, "send");
+  recv_orig = (PFN_recv)GetProcAddress(wsock, "recv");
+
   DetourTransactionBegin();
   DetourUpdateThread(GetCurrentThread());
   DetourAttach(&(PVOID&)CNetworkAdmin_setFrameLimitOrig, CNetworkAdmin_setFrameLimitPatched);
   DetourAttach(&(PVOID&)CMangler_Pattern_Query_Orig, CMangler_Pattern_Query_Patched);
+  DetourAttach(&(PVOID&)sendto_orig, sendto_override_static);
+  DetourAttach(&(PVOID&)recvfrom_orig, recvfrom_override_static);
+  DetourAttach(&(PVOID&)WSAAsyncSelect_orig, WSAAsyncSelect_override_static);
+  DetourAttach(&(PVOID&)connect_orig, connect_override_static);
+  DetourAttach(&(PVOID&)send_orig, send_override_static);
+  DetourAttach(&(PVOID&)recv_orig, recv_override_static);
   DetourTransactionCommit();
-
-  proxy->installHooks();
 
   WSAData wSAData = {};
   // init api version 1.1, because that's what emperor uses
   WSAStartup(MAKEWORD(1, 1), &wSAData);
-  proxy->initialise();
 
-  std::thread([proxy=std::move(proxy)]()
+  staticProxy = proxy;
+  staticProxy->initialise();
+
+  std::thread([]()
   {
-    proxy->run();
+    staticProxy->run();
   }).detach();
 }
 
@@ -612,11 +625,11 @@ void init(std::unique_ptr<Proxy> proxy)
 void patchWolAsServer()
 {
   proxylog("initialising as server\n");
-  init(std::unique_ptr<Proxy>(new ProxyServer()));
+  init(new ProxyServer());
 }
 
 void patchWolAsClient(const std::string& serverAddr)
 {
   proxylog("initialising as client, connecting to: %s\n", serverAddr.c_str());
-  init(std::unique_ptr<Proxy>(new ProxyClient(serverAddr)));
+  init(new ProxyClient(serverAddr));
 }

@@ -6,6 +6,7 @@
 struct SomeNetworkManager;
 struct GlobalStuff;
 struct GraphicsContext;
+struct GameOptions;
 
 struct IpAndPort
 {
@@ -42,6 +43,78 @@ struct CNetworkAdmin
   DWORD unk4[66];
 };
 
+struct SomeIntSettingVtable
+{
+  void* probablyFree;
+  void* saveIntToReg;
+  void* readIntFromReg;
+  void* unk0;
+  void* unk2;
+};
+
+struct stdString
+{
+  DWORD maybeAllocator;
+  char* data;
+  DWORD length;
+  DWORD maybeCapacity;
+};
+
+
+struct SomeIntSetting
+{
+  SomeIntSettingVtable* vtable;
+  stdString registryValueName;
+  stdString optionName;
+  DWORD unk2;
+  DWORD intValue;
+};
+
+struct Node
+{
+  Node* maybeNext;
+  Node* someNode;
+  Node* someNode2;
+  stdString someString;
+  SomeIntSetting* intSetting;
+  DWORD unk;
+};
+
+struct SomeList
+{
+  DWORD unk;
+  Node* node;
+  DWORD unk2[2];
+};
+
+
+struct SomethingWithDataInIt
+{
+  DWORD* someVtable;
+  SomeList someList;
+};
+
+struct GameOptions
+{
+  DWORD unk[5];
+  SomethingWithDataInIt* somethingWithDataInIt;
+};
+
+struct COptionsStorage
+{
+  DWORD unk[17];
+  char selectedIp[1];
+  DWORD unk2[99];
+  GameOptions gameOptions;
+  DWORD unk4[12];
+};
+
+struct SomeGlobalThing
+{
+  COptionsStorage* optionsStorage;
+  DWORD unkwrongSize[5];
+};
+
 
 typedef size_t(__cdecl* PFN_setupSoundCdPaths)(const char* driveLetterPath, int cdIndex);
 typedef void(__cdecl* PFN_sub_477250)();
@@ -60,6 +133,7 @@ typedef BOOL(__cdecl* PFN_setWindowStyleAndDrainMessages)(HWND hWnd, int width, 
 typedef int(__thiscall* PFN_CNetworkAdmin_setFrameLimit)(CNetworkAdmin* This, int value);
 typedef void(*PFN_CMangler_Pattern_Query)();
 typedef int(__stdcall* PFN_WinMain)(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd);
+typedef DWORD(__thiscall* PFN_GameOptions_getGameSpeed)(GameOptions* This);
 
 
 #define setupSoundCdPaths ((PFN_setupSoundCdPaths)0x00477220)
@@ -79,6 +153,7 @@ typedef int(__stdcall* PFN_WinMain)(HINSTANCE hInstance, HINSTANCE hPrevInstance
 #define CNetworkAdmin_setFrameLimit ((PFN_CNetworkAdmin_setFrameLimit)0x00406220)
 #define CMangler_Pattern_Query ((PFN_CMangler_Pattern_Query)0x005AC370)
 #define GameExeWinMain ((PFN_WinMain)0x004A73D0)
+#define GameOptions_getGameSpeed ((PFN_GameOptions_getGameSpeed)0x00509A30)
 
 
 #define IMP(type, address) (*((type*)address))
@@ -99,3 +174,4 @@ typedef int(__stdcall* PFN_WinMain)(HINSTANCE hInstance, HINSTANCE hPrevInstance
 #define gContext IMP(GraphicsContext*, 0x007D75B4)
 #define gNetworkAdmin1 IMP(CNetworkAdmin*, 0x007CB9D4)
 #define onlineGameHostPort IMP(u_short, 0x00B74C68)
+#define someGlobalThing IMP(SomeGlobalThing, 0x007D75E8)
