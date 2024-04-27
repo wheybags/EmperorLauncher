@@ -296,6 +296,106 @@ void CMangler_Pattern_QueryPatched()
   return;
 }
 
+void runHooks()
+{
+  //MessageBoxA(nullptr, "AAAAA", "AAAA", 0);
+
+  DWORD size = sizeof(DWORD);
+  HRESULT result = RegGetValueA(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\LauncherCustomSettings", "DoFullscreen", RRF_RT_REG_DWORD, nullptr, &emperorLauncherDoFullscreen, &size);
+
+  std::string serverAddress;
+  {
+    DWORD buffSize = 1024;
+    char buff[1024];
+    HRESULT result = RegGetValueA(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\LauncherCustomSettings", "ServerAddress", RRF_RT_REG_SZ, nullptr, &buff, &buffSize);
+    release_assert(SUCCEEDED(result));
+    serverAddress = buff;
+  }
+
+
+  SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
+
+  setupConsole();
+
+  DetourTransactionBegin();
+  DetourUpdateThread(GetCurrentThread());
+  DetourAttach(&(PVOID&)OutputDebugStringAReal, OutputDebugStringAWrap);
+  DetourAttach(&(PVOID&)OutputDebugStringWReal, OutputDebugStringWWrap);
+  //DetourAttach(&(PVOID&)TrueShowCursor, FakeShowCursor);
+  DetourAttach(&(PVOID&)setWindowStyleAndDrainMessagesOriginal, setWindowStyleAndDrainMessages);
+
+  DetourAttach(&(PVOID&)doCdCheckOrig, doCdCheckPatched);
+  DetourAttach(&(PVOID&)regSettingsOpenHkeyOrig, regSettingsOpenHkeyPatched);
+  DetourAttach(&(PVOID&)wndProcDuneIIIOrig, wndProcDuneIIIPatched);
+  DetourAttach(&(PVOID&)CNetworkAdmin_setFrameLimitOrig, CNetworkAdmin_setFrameLimitPatched);
+  DetourAttach(&(PVOID&)CMangler_Pattern_QueryOrig, CMangler_Pattern_QueryPatched);
+  HookD3D7();
+  patchDebugLog();
+  //patchLan();
+  DetourTransactionCommit();
+
+  patchD3D7ResolutionLimit();
+
+  wrapWinsockWithLogging();
+
+  if (!serverAddress.empty())
+    installProxyClient(serverAddress);
+  else
+    installProxyServer();
+
+  if (emperorLauncherDoFullscreen)
+  {
+    createBackgroundWindow();
+    std::thread([]() { backgroundWindowLoop(); }).detach();
+  }
+
+  std::thread([]()
+  {
+    while (true)
+    {
+      Sleep(1000 * 1);
+
+      if (!*mainWindowHandleP)
+        continue;
+
+      if (!emperorLauncherDoFullscreen)
+      {
+        if (*mainWindowHandleP != GetForegroundWindow())
+          continue;
+      }
+
+      RECT rect = {};
+      if (!GetClientRect(*mainWindowHandleP, &rect))
+        continue;
+
+      POINT topLeft = { 0, 0 };
+      if (!ClientToScreen(*mainWindowHandleP, &topLeft))
+        continue;
+
+      rect.left += topLeft.x;
+      rect.right += topLeft.x;
+      rect.top += topLeft.y;
+      rect.bottom += topLeft.y;
+
+      rect.left += 10;
+      rect.top += 10;
+      rect.right -= 10;
+      rect.bottom -= 10;
+
+      myClipCursor(&rect);
+    }
+  }).detach();
+}
+
+
+// defer all our custom setup to just before WinMain rather than directly in DllMain, because there are a
+// lot of restrictions on what you're allowed to do inside DllMain
+int __stdcall WinMainPatched(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
+{
+  runHooks();
+  return WinMainOrig(hInstance, hPrevInstance, lpCmdLine, nShowCmd);
+}
+
 
 __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOID reserved)
 {
@@ -305,92 +405,14 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinst, DWORD dwReason, LPVOI
 
   if (dwReason == DLL_PROCESS_ATTACH)
   {
-    DWORD size = sizeof(DWORD);
-    HRESULT result = RegGetValueA(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\LauncherCustomSettings", "DoFullscreen", RRF_RT_REG_DWORD, nullptr, &emperorLauncherDoFullscreen, &size);
-
-    std::string serverAddress;
-    {
-      DWORD buffSize = 1024;
-      char buff[1024];
-      HRESULT result = RegGetValueA(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\LauncherCustomSettings", "ServerAddress", RRF_RT_REG_SZ, nullptr, &buff, &buffSize);
-      release_assert(SUCCEEDED(result));
-      serverAddress = buff;
-    }
-
     DetourRestoreAfterWith();
-
-    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
-
-    setupConsole();
 
     DetourTransactionBegin();
     DetourUpdateThread(GetCurrentThread());
-    DetourAttach(&(PVOID&)OutputDebugStringAReal, OutputDebugStringAWrap);
-    DetourAttach(&(PVOID&)OutputDebugStringWReal, OutputDebugStringWWrap);
-    //DetourAttach(&(PVOID&)TrueShowCursor, FakeShowCursor);
-    DetourAttach(&(PVOID&)setWindowStyleAndDrainMessagesOriginal, setWindowStyleAndDrainMessages);
 
-    DetourAttach(&(PVOID&)doCdCheckOrig, doCdCheckPatched);
-    DetourAttach(&(PVOID&)regSettingsOpenHkeyOrig, regSettingsOpenHkeyPatched);
-    DetourAttach(&(PVOID&)wndProcDuneIIIOrig, wndProcDuneIIIPatched);
-    DetourAttach(&(PVOID&)CNetworkAdmin_setFrameLimitOrig, CNetworkAdmin_setFrameLimitPatched);
-    DetourAttach(&(PVOID&)CMangler_Pattern_QueryOrig, CMangler_Pattern_QueryPatched);
-    HookD3D7();
-    patchDebugLog();
-    //patchLan();
+    DetourAttach(&(PVOID&)WinMainOrig, WinMainPatched);
+
     DetourTransactionCommit();
-
-    patchD3D7ResolutionLimit();
-
-    wrapWinsockWithLogging();
-
-    if (!serverAddress.empty())
-      installProxyClient(serverAddress);
-    else
-      installProxyServer();
-
-    if (emperorLauncherDoFullscreen)
-    {
-      createBackgroundWindow();
-      std::thread([]() { backgroundWindowLoop(); }).detach();
-    }
-
-    std::thread([]()
-    {
-      while (true)
-      {
-        Sleep(1000 * 1);
-
-        if (!*mainWindowHandleP)
-          continue;
-
-        if (!emperorLauncherDoFullscreen)
-        {
-          if (*mainWindowHandleP != GetForegroundWindow())
-            continue;
-        }
-
-        RECT rect = {};
-        if (!GetClientRect(*mainWindowHandleP, &rect))
-          continue;
-
-        POINT topLeft = {0, 0};
-        if (!ClientToScreen(*mainWindowHandleP, &topLeft))
-          continue;
-
-        rect.left += topLeft.x;
-        rect.right += topLeft.x;
-        rect.top += topLeft.y;
-        rect.bottom += topLeft.y;
-
-        rect.left += 10;
-        rect.top += 10;
-        rect.right -= 10;
-        rect.bottom -= 10;
-
-        myClipCursor(&rect);
-      }
-    }).detach();
   }
 
   return TRUE;

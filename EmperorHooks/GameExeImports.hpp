@@ -63,6 +63,7 @@ extern bool(__cdecl* testPort)(u_short hostshort);
 extern void(__cdecl* CPortUtil_Set_Port_RangeOrig)(unsigned __int16 port_h_min, unsigned __int16 port_h_max);
 extern void(*CMangler_Pattern_QueryOrig)();
 extern void(__cdecl* sendPortRangeUpdatePacketOrig)(void* p_user, int Id, unsigned __int16 port_h_min, unsigned __int16 port_h_max);
+extern int(__stdcall* WinMainOrig)(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd);
 
 extern DWORD* dword_B7D098P;
 

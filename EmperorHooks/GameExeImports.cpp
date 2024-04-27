@@ -21,6 +21,7 @@ bool(__cdecl* testPort)(u_short hostshort) = (bool(__cdecl*)(u_short hostshort))
 void(__cdecl* CPortUtil_Set_Port_RangeOrig)(unsigned __int16 port_h_min, unsigned __int16 port_h_max) = (void(__cdecl*)(unsigned __int16 port_h_min, unsigned __int16 port_h_max))0x005AEF60;
 void(*CMangler_Pattern_QueryOrig)() = (void(*)())0x005AC370;
 void(__cdecl* sendPortRangeUpdatePacketOrig)(void* p_user, int Id, unsigned __int16 port_h_min, unsigned __int16 port_h_max) = (void(__cdecl*)(void* p_user, int Id, unsigned __int16 port_h_min, unsigned __int16 port_h_max))0x005ACB50;
+int(__stdcall* WinMainOrig)(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) = (int(__stdcall*)(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd))0x004A73D0;
 
 DWORD* dword_B7D098P = (DWORD*)0xB7D098;
 
