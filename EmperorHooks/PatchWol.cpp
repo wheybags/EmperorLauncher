@@ -13,7 +13,6 @@
 #include "CRC.hpp"
 #include <optional>
 #include "GameExeImports.hpp"
-#include "PatchDebugLog.hpp"
 
 
 #define proxylog(format, ...) Log("\033[32m" format "\033[0m", __VA_ARGS__)
@@ -57,6 +56,7 @@ class Proxy
 public:
   virtual void initialise() = 0;
   virtual void run() = 0;
+  virtual bool isServer() = 0;
 
 public:
   virtual int sendto_override(SOCKET s, const char* buf, int len, int flags, const struct sockaddr* to, int tolen) = 0;
@@ -312,6 +312,7 @@ class ProxyServer : public Proxy
 public:
   void initialise() override;
   void run() override;
+  bool isServer() override { return true; }
 
 private:
   int sendto_override(SOCKET s, const char* buf, int len, int flags, const struct sockaddr* to, int tolen) override;
@@ -431,6 +432,7 @@ public:
 
   void initialise() override;
   void run() override;
+  bool isServer() override { return false; }
 
 private:
   int sendto_override(SOCKET s, const char* buf, int len, int flags, const struct sockaddr* to, int tolen) override;
@@ -525,14 +527,9 @@ int ProxyClient::sendto_override(SOCKET s, const char* buf, int len, int flags, 
 PFN_CNetworkAdmin_setFrameLimit CNetworkAdmin_setFrameLimitOrig = CNetworkAdmin_setFrameLimit;
 int __fastcall CNetworkAdmin_setFrameLimitPatched(CNetworkAdmin* This, DWORD edx, int value)
 {
-  // This isn't perfect, it is not set until a while after starting the game. Also it won't get reset if you
-  // play single player after an mp game. Luckily, it doesn't seem to matter if we do or don't force the
-  // frame limit in an sp game, so in practice it works well enough for our purposes.
-  bool isServer = networkTypeDerivedFromLogOutput == NetworkFromLogType::Server;
-
-  if (isServer)
+  if (staticProxy->isServer())
   {
-    // This switch is mostly copied from CNetworkAdmin_setFrameLimitFromGlobalSettings(This), but without a special case check
+    // This switch is mostly copied from CNetworkAdmin::setFrameLimitFromGlobalSettings, but without a special case check
     // that seems to cause crashes when we use it from an unexpected place like this
     int maxFrameLimit = 0;
     switch (GameOptions_getGameSpeed(&someGlobalThing.optionsStorage->gameOptions))
@@ -551,6 +548,7 @@ int __fastcall CNetworkAdmin_setFrameLimitPatched(CNetworkAdmin* This, DWORD edx
       break;
     case 5u:
       maxFrameLimit = 20;
+      break;
     case 6u:
       maxFrameLimit = 25;
       break;

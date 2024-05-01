@@ -1633,16 +1633,9 @@ PatchElement patches[] =
   PatchElement{0x5afd11, 0x9B, 0xA0},
 };
 
-NetworkFromLogType networkTypeDerivedFromLogOutput = NetworkFromLogType::NotSeenYet;
 
 void LogPatched(const char* format, ...)
 {
-  // Yes, this is a shitty way to figure out if we're host or not, but I couldn't figure out a proper way :(
-  if (strcmp(format, "CLIENT Done") == 0)
-    networkTypeDerivedFromLogOutput = NetworkFromLogType::Client;
-  else if (strcmp(format, "HOST Done") == 0)
-    networkTypeDerivedFromLogOutput = NetworkFromLogType::Server;
-
   va_list args = nullptr;
   va_start(args, format);
   vaLog(format, args);
