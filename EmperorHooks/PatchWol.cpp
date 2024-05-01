@@ -13,6 +13,7 @@
 #include "CRC.hpp"
 #include <optional>
 #include "GameExeImports.hpp"
+#include <combaseapi.h>
 
 
 #define proxylog(format, ...) Log("\033[32m" format "\033[0m", __VA_ARGS__)
@@ -582,11 +583,45 @@ static int PASCAL connect_override_static(SOCKET s, const struct sockaddr* name,
 static int PASCAL send_override_static(SOCKET s, const char* buf, int len, int flags) { return staticProxy->send_override(s, buf, len, flags); }
 static int PASCAL recv_override_static(SOCKET s, char* buf, int len, int flags) { return staticProxy->recv_override(s, buf, len, flags); }
 
+typedef HRESULT(__stdcall* PFN_DllRegisterServer)();
+
+// WOL access is provided through a separately installed COM type library (WOLAPI.DLL).
+// It's annoying to have to use the old broken installer though, so here we just register the type
+// library ourselves. We use registry redirects to allow us to do this without admin privileges,
+// and OaEnablePerUserTLibRegistration is a magic function that makes the redirects work for
+// registering a type library.
+// Technique from here: https://stackoverflow.com/q/44379353
+void registerWolTypeLibrary()
+{
+  HMODULE wolApi = nullptr;
+  wolApi = LoadLibraryA("WOL/WOLAPI.DLL");
+
+  // if they don't have the wolapi dll in their game folder, maybe they have it globally installed
+  if (!wolApi)
+    return;
+
+  PFN_DllRegisterServer wolApiRegisterServer = (PFN_DllRegisterServer)GetProcAddress(wolApi, "DllRegisterServer");
+  release_assert(wolApiRegisterServer);
+
+  OaEnablePerUserTLibRegistration();
+
+  HKEY key = nullptr;
+  release_assert(RegCreateKeyA(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\HKCR", &key) == ERROR_SUCCESS);
+  release_assert(RegOverridePredefKey(HKEY_CLASSES_ROOT, key) == ERROR_SUCCESS);
+  RegCloseKey(key);
+
+  release_assert(SUCCEEDED(wolApiRegisterServer()));
+
+  release_assert(RegOverridePredefKey(HKEY_CLASSES_ROOT, nullptr) == ERROR_SUCCESS);
+
+  CloseHandle(wolApi);
+}
 
 void init(Proxy* proxy)
 {
-  HMODULE wsock = LoadLibraryA("wsock32.dll");
+  registerWolTypeLibrary();
 
+  HMODULE wsock = LoadLibraryA("wsock32.dll");
   sendto_orig = (PFN_sendto)GetProcAddress(wsock, "sendto");
   recvfrom_orig = (PFN_recvfrom)GetProcAddress(wsock, "recvfrom");
   WSAAsyncSelect_orig = (PFN_WSAAsyncSelect)GetProcAddress(wsock, "WSAAsyncSelect");

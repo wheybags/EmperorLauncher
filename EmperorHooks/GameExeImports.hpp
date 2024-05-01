@@ -175,3 +175,7 @@ typedef DWORD(__thiscall* PFN_GameOptions_getGameSpeed)(GameOptions* This);
 #define gNetworkAdmin1 IMP(CNetworkAdmin*, 0x007CB9D4)
 #define onlineGameHostPort IMP(u_short, 0x00B74C68)
 #define someGlobalThing IMP(SomeGlobalThing, 0x007D75E8)
+#define CLSID_ICHAT IMP(IID, 0x005DA240)
+#define CLSID_DownloadHandler IMP(IID, 0x005DA250)
+#define CLSID_INetUtil IMP(IID, 0x005DA260)
+#define CLSID_WolBrowser IMP(IID, 0x005DA2C0)
