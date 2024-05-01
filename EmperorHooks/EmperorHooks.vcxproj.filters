@@ -35,7 +35,7 @@
     <ClInclude Include="PatchDebugLog.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="PatchSettings.hpp">
+    <ClInclude Include="PatchRegistry.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="WrapWinsock.hpp">
@@ -76,7 +76,7 @@
     <ClCompile Include="PatchDebugLog.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="PatchSettings.cpp">
+    <ClCompile Include="PatchRegistry.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="PatchWindowManagement.cpp">

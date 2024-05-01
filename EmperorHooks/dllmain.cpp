@@ -6,7 +6,7 @@
 #include "GameExeImports.hpp"
 #include "DoCdCheck.hpp"
 #include "PatchDebugLog.hpp"
-#include "PatchSettings.hpp"
+#include "PatchRegistry.hpp"
 #include "PatchWindowManagement.hpp"
 #include "WrapWinsock.hpp"
 #include "Log.hpp"

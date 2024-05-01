@@ -110,7 +110,7 @@ nmake</Command>
     <ClInclude Include="WinsockApi.hpp" />
     <ClInclude Include="PatchD3D7ResolutionLimit.hpp" />
     <ClInclude Include="PatchDebugLog.hpp" />
-    <ClInclude Include="PatchSettings.hpp" />
+    <ClInclude Include="PatchRegistry.hpp" />
     <ClInclude Include="PatchWindowManagement.hpp" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="WrapWinsock.hpp" />
@@ -124,7 +124,7 @@ nmake</Command>
     <ClCompile Include="WinsockApi.cpp" />
     <ClCompile Include="PatchD3D7ResolutionLimit.cpp" />
     <ClCompile Include="PatchDebugLog.cpp" />
-    <ClCompile Include="PatchSettings.cpp" />
+    <ClCompile Include="PatchRegistry.cpp" />
     <ClCompile Include="PatchWindowManagement.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
