@@ -14,12 +14,6 @@
     <ClInclude Include="HookD3D7.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="framework.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="pch.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="Error.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -59,9 +53,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="pch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="HookD3D7.cpp">

@@ -55,11 +55,13 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_CRT_SECURE_NO_WARNINGS;_DEBUG;EMPERORHOOKS_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <PrecompiledHeader>Use</PrecompiledHeader>
-      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>
+      </PrecompiledHeaderFile>
       <AdditionalIncludeDirectories>$(SolutionDir)Detours-4.0.1\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <PrecompiledHeaderOutputFile />
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -80,10 +82,12 @@ nmake</Command>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_CRT_SECURE_NO_WARNINGS;NDEBUG;EMPERORHOOKS_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <PrecompiledHeader>Use</PrecompiledHeader>
-      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>
+      </PrecompiledHeaderFile>
       <AdditionalIncludeDirectories>$(SolutionDir)Detours-4.0.1\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <PrecompiledHeaderOutputFile />
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -101,7 +105,6 @@ nmake</Command>
   <ItemGroup>
     <ClInclude Include="CRC.hpp" />
     <ClInclude Include="Error.hpp" />
-    <ClInclude Include="framework.h" />
     <ClInclude Include="GameExeImports.hpp" />
     <ClInclude Include="PatchWol.hpp" />
     <ClInclude Include="HookD3D7.hpp" />
@@ -112,7 +115,6 @@ nmake</Command>
     <ClInclude Include="PatchDebugLog.hpp" />
     <ClInclude Include="PatchRegistry.hpp" />
     <ClInclude Include="PatchWindowManagement.hpp" />
-    <ClInclude Include="pch.h" />
     <ClInclude Include="WrapWinsock.hpp" />
   </ItemGroup>
   <ItemGroup>
@@ -126,10 +128,6 @@ nmake</Command>
     <ClCompile Include="PatchDebugLog.cpp" />
     <ClCompile Include="PatchRegistry.cpp" />
     <ClCompile Include="PatchWindowManagement.cpp" />
-    <ClCompile Include="pch.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
-    </ClCompile>
     <ClCompile Include="WrapWinsock.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

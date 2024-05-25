@@ -1,8 +1,6 @@
-#include "pch.h"
-
 #define INITGUID
 #define CINTERFACE
-#include <Windows.h>
+#include <windows.h>
 #include "dx7sdk_include/ddraw.h"
 #include "dx7sdk_include/d3d.h"
 #include <cstdio>

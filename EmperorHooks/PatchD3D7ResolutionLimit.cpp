@@ -1,6 +1,5 @@
-#include "pch.h"
 #include "PatchD3D7ResolutionLimit.hpp"
-#include <Windows.h>
+#include <windows.h>
 
 // adapted from https://github.com/UCyborg/LegacyD3DResolutionHack/
 // and dxwrapper: https://github.com/elishacloud/dxwrapper/blob/0daa30e6a586effcb8fb47ae3537ddedd5d9b78b/ddraw/IDirect3DX.cpp#L858

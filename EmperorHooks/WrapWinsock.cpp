@@ -1,4 +1,4 @@
-#include "pch.h"
+#include <windows.h>
 #include <detours.h>
 #include <string>
 #include "Log.hpp"

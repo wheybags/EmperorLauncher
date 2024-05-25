@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "Log.hpp"
 #include <cstdio>
 

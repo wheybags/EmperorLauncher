@@ -1,4 +1,4 @@
-#include "pch.h"
+#include <windows.h>
 #include "GameExeImports.hpp"
 #include <stdio.h>
 #include <detours.h>

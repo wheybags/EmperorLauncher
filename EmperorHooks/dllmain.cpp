@@ -1,4 +1,3 @@
-#include "pch.h"
 #include <windows.h>
 #include <detours.h>
 #include "HookD3D7.hpp"

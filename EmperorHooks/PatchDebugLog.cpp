@@ -1,4 +1,4 @@
-#include "pch.h"
+#include <windows.h>
 #include <cstdint>
 #include <stdio.h>
 #include <detours.h>
