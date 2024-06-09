@@ -13,9 +13,10 @@
 #include <optional>
 #include "GameExeImports.hpp"
 #include <combaseapi.h>
+#include "WolServer.hpp"
 
-
-#define proxylog(format, ...) Log("\033[32m" format "\033[0m", __VA_ARGS__)
+//#define proxylog(format, ...) Log("\033[32m" format "\033[0m", __VA_ARGS__)
+#define proxylog(format, ...) do {} while(0)
 
 constexpr u_short proxyPortH = 1337;
 
@@ -365,6 +366,11 @@ void ProxyServer::initialise()
   release_assert(bind(this->sock, (sockaddr*)&bindAddress, sizeof(sockaddr_in)) == 0);
 
   this->servservAddr.S_un.S_addr = inet_addr("127.0.119.98");
+
+  std::thread([]() {
+    WolServer wolServer;
+    wolServer.run();
+  }).detach();
 }
 
 void ProxyServer::run()

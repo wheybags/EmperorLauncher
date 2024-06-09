@@ -55,6 +55,8 @@ private:
     void handle_TOPIC(const std::vector<std::string>& line, const std::string& lineStr);
     void handle_GAMEOPT(const std::vector<std::string>& line, const std::string& lineStr);
     void handle_STARTG(const std::vector<std::string>& line);
+    void handle_PART(const std::vector<std::string>& line);
+    void handle_PRIVMSG(const std::vector<std::string>& line, const std::string& lineStr);
 
   public:
     std::string nick;

@@ -4,6 +4,7 @@
 #include "Error.hpp"
 #include "Misc.hpp"
 #include <optional>
+#include "Log.hpp"
 
 
 
@@ -15,11 +16,9 @@
 // https://www.rfc-editor.org/rfc/rfc1459#section-4.2.1
 
 
+
 void WolServer::run()
 {
-  WSADATA wsaData;
-  release_assert(WSAStartup(MAKEWORD(1, 1), &wsaData) == 0);
-
   sockaddr_in serverAddr;
   serverAddr.sin_family = AF_INET;
   serverAddr.sin_port = htons(4005);
@@ -85,9 +84,8 @@ void WolServer::clientLoop(Connection& connection)
   {
     int result = recv(connection.socket, buffer.data(), int(buffer.size()), 0);
     int a = WSAGetLastError();
-    release_assert(result >= 0);
 
-    if (result == 0)
+    if (result <= 0)
       connection.connected = false;
 
     std::scoped_lock lock(this->connectionsMutex);
@@ -102,7 +100,7 @@ void WolServer::clientLoop(Connection& connection)
 
         if (!command.empty())
         {
-          printf("%s\n", command[0].c_str());
+          //printf("%s\n", command[0].c_str());
 
           if (command[0] == "verchk")
           {
@@ -200,6 +198,14 @@ void WolServer::clientLoop(Connection& connection)
           {
             connection.handle_STARTG(command);
           }
+          else if (command[0] == "PART")
+          {
+            connection.handle_PART(command);
+          }
+          else if (command[0] == "PRIVMSG")
+          {
+            connection.handle_PRIVMSG(command, lineBuffer);
+          }
           else
           {
             release_assert(false);
@@ -241,13 +247,7 @@ void WolServer::clientLoop(Connection& connection)
 
 std::string WolServer::Connection::getIpIntString() const
 {
-  std::string a = std::to_string(this->clientAddr.sin_addr.S_un.S_addr);
-  std::string b = std::to_string(ntohl(this->clientAddr.sin_addr.S_un.S_addr));
-  std::string c = inet_ntoa(this->clientAddr.sin_addr);
-
-  printf("AAAAAAAAAAAAA %s %s %s\n", a.c_str(), b.c_str(), c.c_str());
-
-  return b;
+  return std::to_string(ntohl(this->clientAddr.sin_addr.S_un.S_addr));
 }
 
 std::string WolServer::Connection::getIpString() const
@@ -260,6 +260,9 @@ std::string WolServer::Connection::getIpString() const
 // the original westwood servers. The player "wheybags" is hosting, and "wheybags2" connects.
 // I don't know what software the xwis server is running. It doesn't seem to be using PVPGN, as the
 // responses are notably different from what I've seen in the PVPGN source code.
+
+#define wolcommand_assert(X) release_assert(X)
+//#define wolcommand_assert(X) if (!(X)) do { Log("wolcommand_assert failed: %s, %s:%d", #X, __FILE__, __LINE__); return; } while (0)
 
 
 void WolServer::Connection::handle_verchk(const std::vector<std::string>& line)
@@ -347,12 +350,7 @@ void WolServer::Connection::handle_PASS(const std::vector<std::string>& line)
 
 void WolServer::Connection::handle_NICK(const std::vector<std::string>& line)
 {
-  if (line.size() != 2)
-  {
-    printf("bad NICK command\n");
-    return;
-  }
-
+  wolcommand_assert(line.size() == 2);
   this->nick = line[1];
 }
 
@@ -404,22 +402,18 @@ void WolServer::Connection::handle_JOINGAME(const std::vector<std::string>& line
     // There can be a 9th parameter, which is a password, if present.
 
 
-    if (this->hosting)
-    {
-      printf("trying to host a game while already hosting!\n");
-      return;
-    }
+    wolcommand_assert(!this->hosting);
 
     // Not entirely sure how we're really supposed to handle these, so I'm just
     // asserting that the parameters are what I expect, then hardcoding the responses
-    release_assert(line[1] == "#" + this->nick);
-    release_assert(line[2] == "1");
-    release_assert(line[3] == "2");
-    release_assert(line[4] == "31");
-    release_assert(line[5] == "3");
-    release_assert(line[6] == "1");
-    release_assert(line[7] == "0");
-    release_assert(line[8] == "0");
+    wolcommand_assert(line[1] == "#" + this->nick);
+    wolcommand_assert(line[2] == "1");
+    wolcommand_assert(line[3] == "2");
+    wolcommand_assert(line[4] == "31");
+    wolcommand_assert(line[5] == "3");
+    wolcommand_assert(line[6] == "1");
+    wolcommand_assert(line[7] == "0");
+    wolcommand_assert(line[8] == "0");
 
     this->hosting = true;
     this->hostChannelName = line[1].substr(1);
@@ -450,10 +444,10 @@ void WolServer::Connection::handle_JOINGAME(const std::vector<std::string>& line
   }
   else
   {
-    release_assert(false);
+    wolcommand_assert(false);
   }
 
-  release_assert(hostConnection);
+  wolcommand_assert(hostConnection);
 
   hostConnection->hostChannelMembers.emplace_back(this);
   this->connectedToChannel = hostConnection;
@@ -546,7 +540,7 @@ void WolServer::Connection::handle_SETCODEPAGE(const std::vector<std::string>& l
   // >>SETCODEPAGE 1252
   // <<: 329 u 1252
 
-  release_assert(line.size() == 2);
+  wolcommand_assert(line.size() == 2);
 
   this->codepage = std::stoi(line[1]);
 
@@ -560,7 +554,7 @@ void WolServer::Connection::handle_GETCODEPAGE(const std::vector<std::string>& l
   // >>GETCODEPAGE wheybags
   // <<: 328 u wheybags`1252
 
-  release_assert(line.size() >= 2);
+  wolcommand_assert(line.size() >= 2);
 
   std::string response = ": 328 u ";
 
@@ -578,7 +572,7 @@ void WolServer::Connection::handle_GETCODEPAGE(const std::vector<std::string>& l
       }
     }
 
-    release_assert(connection);
+    wolcommand_assert(connection);
 
     response += line[i] + "`" + std::to_string(connection->codepage);
     if (i != int32_t(line.size()) - 1)
@@ -596,7 +590,7 @@ void WolServer::Connection::handle_SETLOCALE(const std::vector<std::string>& lin
   // >>SETLOCALE 0
   // <<: 310 u 0
 
-  release_assert(line.size() == 2);
+  wolcommand_assert(line.size() == 2);
 
   this->locale = std::stoi(line[1]);
 
@@ -609,7 +603,7 @@ void WolServer::Connection::handle_GETLOCALE(const std::vector<std::string>& lin
   // >>GETLOCALE wheybags
   // <<: 309 u wheybags`0
 
-  release_assert(line.size() == 2);
+  wolcommand_assert(line.size() == 2);
 
   std::string response = ": 309 u " + line[1] + "`" + std::to_string(this->locale) + "\r\n";
   send(socket, response.data(), int(response.size()), 0);
@@ -631,7 +625,7 @@ void WolServer::Connection::handle_GETINSIDER(const std::vector<std::string>& li
   // >>GETINSIDER wheybags
   // <<: 399 u wheybags`0
 
-  release_assert(line.size() == 2);
+  wolcommand_assert(line.size() == 2);
 
   std::string response = ": 399 u " + line[1] + "`0\r\n";
   send(socket, response.data(), int(response.size()), 0);
@@ -643,7 +637,7 @@ void WolServer::Connection::handle_TIME(const std::vector<std::string>& line)
   // >>TIME
   // <<: 391 u irc.westwood.com :1716318379
 
-  release_assert(line.size() == 1);
+  wolcommand_assert(line.size() == 1);
 
   std::string response = ": 391 u irc.westwood.com :" + std::to_string(time(nullptr)) + "\r\n";
   send(socket, response.data(), int(response.size()), 0);
@@ -655,7 +649,7 @@ void WolServer::Connection::handle_GETBUDDY(const std::vector<std::string>& line
   // >>GETBUDDY
   // <<: 333 u // trailing space
 
-  release_assert(line.size() == 1);
+  wolcommand_assert(line.size() == 1);
 
   std::string response = ": 333 u \r\n";
   send(socket, response.data(), int(response.size()), 0);
@@ -667,9 +661,9 @@ void WolServer::Connection::handle_TOPIC(const std::vector<std::string>& line, c
   // >>TOPIC #wheybags :g1\x932\x03\x01wheybags       // one trailing space at the end of this line
   // << **no response**
 
-  release_assert(line.size() >= 3);
-  release_assert(this->hosting);
-  release_assert(line[1] == "#" + this->hostChannelName);
+  wolcommand_assert(line.size() >= 3);
+  wolcommand_assert(this->hosting);
+  wolcommand_assert(line[1] == "#" + this->hostChannelName);
 
   this->hostChannelTopic = lineStr.substr(line[0].length() + 1 + line[1].length() + 1);
   if (this->hostChannelTopic.ends_with("\r\n"))
@@ -677,7 +671,7 @@ void WolServer::Connection::handle_TOPIC(const std::vector<std::string>& line, c
   else if (this->hostChannelTopic.ends_with("\n"))
     this->hostChannelTopic.resize(this->hostChannelTopic.size() - 1);
 
-  release_assert(!this->hostChannelTopic.empty() && this->hostChannelTopic[0] == ':');
+  wolcommand_assert(!this->hostChannelTopic.empty() && this->hostChannelTopic[0] == ':');
   this->hostChannelTopic.erase(0, 1);
 }
 
@@ -690,8 +684,8 @@ void WolServer::Connection::handle_GAMEOPT(const std::vector<std::string>& line,
   // All other clients receive:
   // <<:wheybags!u@h GAMEOPT wheybags2 :**a pile of binary**
 
-  release_assert(line.size() >= 3);
-  release_assert(this->connectedToChannel);
+  wolcommand_assert(line.size() >= 3);
+  wolcommand_assert(this->connectedToChannel);
 
   std::string data = lineStr.substr(line[0].length() + 1 + line[1].length() + 2);
   std::string forwardMessage = ":" + this->nick + "!u@h GAMEOPT " + line[1] + " :" + data;
@@ -716,8 +710,8 @@ void WolServer::Connection::handle_STARTG(const std::vector<std::string>& line)
   // >>STARTG #wheybags wheybags, wheybags2
   // <<:wheybags!u@h STARTG u :wheybags 86.246.78.252 wheybags2 86.246.78.252 :1644425801 1716237521    // sent to all clients
 
-  release_assert(this->hosting);
-  release_assert(line[1] == "#" + this->hostChannelName);
+  wolcommand_assert(this->hosting);
+  wolcommand_assert(line[1] == "#" + this->hostChannelName);
 
   std::string response = ":" + this->nick + "!u@h STARTG u :";
   for (int32_t i = 0; i < int32_t(this->hostChannelMembers.size()); i++)
@@ -727,4 +721,94 @@ void WolServer::Connection::handle_STARTG(const std::vector<std::string>& line)
 
   for (int32_t i = 0; i < int32_t(this->hostChannelMembers.size()); i++)
     send(this->hostChannelMembers[i]->socket, response.data(), int(response.size()), 0);
+}
+
+void WolServer::Connection::handle_PART(const std::vector<std::string>& line)
+{
+  // example session:
+  // >>PART #wheybags
+  // <<:wheybags!u@h PART #wheybags
+  // other clients receive the same message. if the host leaves, all clients get PART messages for themselves as well
+
+  wolcommand_assert(line.size() == 2);
+
+  if (!this->connectedToChannel)
+    return;
+
+  wolcommand_assert(line[1] == "#" + this->connectedToChannel->hostChannelName);
+
+  std::string iLeaveMessage = ":" + this->nick + "!u@h PART #" + this->connectedToChannel->hostChannelName + "\r\n";
+
+  for (int32_t i = 0; i < int32_t(this->hostChannelMembers.size()); i++)
+  {
+    send(this->hostChannelMembers[i]->socket, iLeaveMessage.data(), int(iLeaveMessage.size()), 0);
+
+    if (this->hostChannelMembers[i] != this && this->hosting)
+    {
+      std::string message = ":" + this->hostChannelMembers[i]->nick + "!u@h PART #" + this->hostChannelMembers[i]->connectedToChannel->hostChannelName + "\r\n";
+      send(this->hostChannelMembers[i]->socket, message.data(), int(message.size()), 0);
+    }
+  }
+
+  if (this->hosting)
+  {
+    for (int32_t i = 0; i < int32_t(this->hostChannelMembers.size()); i++)
+      this->hostChannelMembers[i]->connectedToChannel = nullptr;
+
+    this->hosting = false;
+    this->hostChannelName.clear();
+    this->hostChannelTopic.clear();
+    this->hostChannelMembers.clear();
+  }
+  else
+  {
+    this->connectedToChannel = nullptr;
+  }
+}
+
+void WolServer::Connection::handle_PRIVMSG(const std::vector<std::string>& line, const std::string& lineStr)
+{
+  // example session:
+  // >>PRIVMSG #wheybags :asasdasd
+  // other clients receive:
+  // <<:wheybags!u@h PRIVMSG #wheybags :asasdasd
+
+  // can also PRIVMSG a user directly instead of a channel
+
+  wolcommand_assert(line.size() >= 3);
+  wolcommand_assert(line[2].starts_with(":"));
+
+  std::string data = lineStr.substr(line[0].length() + 1 + line[1].length() + 2);
+
+  if (line[1].starts_with("#"))
+  {
+    wolcommand_assert(this->connectedToChannel);
+    wolcommand_assert(line[1] == "#" + this->connectedToChannel->hostChannelName);
+
+    std::string message = ":" + this->nick + "!u@h PRIVMSG #" + this->connectedToChannel->hostChannelName + " :" + data + "\r\n";
+
+    for (int32_t i = 0; i < int32_t(this->connectedToChannel->hostChannelMembers.size()); i++)
+    {
+      if (this->connectedToChannel->hostChannelMembers[i] != this)
+        send(this->connectedToChannel->hostChannelMembers[i]->socket, message.data(), int(message.size()), 0);
+    }
+  }
+  else
+  {
+    Connection* target = nullptr;
+
+    for (int32_t i = 0; i < int32_t(server.connections.size()); i++)
+    {
+      if (server.connections[i]->nick == line[1])
+      {
+        target = server.connections[i].get();
+        break;
+      }
+    }
+
+    wolcommand_assert(target);
+
+    std::string message = ":" + this->nick + "!u@h PRIVMSG " + target->nick + " :" + data + "\r\n";
+    send(target->socket, message.data(), int(message.size()), 0);
+  }
 }

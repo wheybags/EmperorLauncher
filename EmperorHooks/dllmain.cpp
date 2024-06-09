@@ -97,7 +97,7 @@ void runHooks()
   patchD3D7ResolutionLimit();
   patchWindowManagement(doFullscreen);
 
-  wrapWinsockWithLogging();
+  //wrapWinsockWithLogging();
 
   if (!serverAddress.empty())
     patchWolAsClient(serverAddress);
