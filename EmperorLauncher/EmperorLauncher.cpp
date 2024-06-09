@@ -3,7 +3,7 @@
 #include <cstdio>
 #include <string>
 
-#define release_assert(X) do { if (!(X)) { DebugBreak(); abort();} } while(false)
+#define release_assert(X) if (!(X)) do { MessageBoxA(nullptr, "assert failed", "assert failed", 0); abort(); } while (0)
 
 
 HANDLE globalCommsFileMappingHandle = nullptr;
@@ -14,136 +14,78 @@ const char* globalCommsEventNameGuid = "D6E7FC97-64F9-4d28-B52C-754EDF721C6F";
 const char* decryptedEmperorDatData = "UIDATA,3DDATA,MAPS";
 
 
-HANDLE closeGlobalCommsHandle()
+void closeGlobalCommsHandle()
 {
-  HANDLE result; // eax
-
   if (globalCommsFileMappingHandle)
   {
     CloseHandle(globalCommsFileMappingHandle);
-    globalCommsFileMappingHandle = 0;
+    globalCommsFileMappingHandle = nullptr;
   }
-  result = globalCommsHandleMutex;
+
   if (globalCommsHandleMutex)
   {
-    result = (HANDLE)CloseHandle(globalCommsHandleMutex);
-    globalCommsHandleMutex = 0;
+    CloseHandle(globalCommsHandleMutex);
+    globalCommsHandleMutex = nullptr;
   }
-  return result;
 }
 
 void createGlobalCommsFileMappingHandle()
 {
-  DWORD emperorDatSize = strlen(decryptedEmperorDatData) + 1;
-  HANDLE handleTemp; // eax
-  struct _SECURITY_ATTRIBUTES FileMappingAttributes; // [esp+8h] [ebp-28h] BYREF
-  
-
   closeGlobalCommsHandle();
-  globalCommsHandleMutex = 0;
-  globalCommsFileMappingHandle = 0;
+
+  SetLastError(0);
   globalCommsHandleMutex = CreateMutexA(0, 0, globalCommsHandleMutexGuid);
-  if (globalCommsHandleMutex && GetLastError() != ERROR_ALREADY_EXISTS)
-  {
-    //QQQSomeStruct2::constructor(&emperorDatPath, aEmperor_dat, 0);
-    //if (QQQSomeStruct2::accessible(&emperorDatPath, 0))
-    {
-      //emperorDatSize = QQQSomeStruct2::getFileSize(&emperorDatPath);
-      FileMappingAttributes = {};
-      FileMappingAttributes.nLength = 12;
-      FileMappingAttributes.lpSecurityDescriptor = 0;
-      FileMappingAttributes.bInheritHandle = 1;
-      handleTemp = CreateFileMappingA((HANDLE)0xFFFFFFFF, &FileMappingAttributes, 4u, 0, emperorDatSize, 0);
-      globalCommsFileMappingHandle = handleTemp;
-      if (!handleTemp)
-      {
-      LABEL_7:
-        CloseHandle(handleTemp);
-        globalCommsFileMappingHandle = 0;
-        goto LABEL_8;
-      }
-      if (GetLastError() == ERROR_ALREADY_EXISTS)
-      {
-        handleTemp = globalCommsFileMappingHandle;
-        goto LABEL_7;
-      }
-    }
-  LABEL_8:
-    (void)0;
-    //std::ios_base::~ios_base((std::ios_base*)&emperorDatPath);
-  }
+  release_assert(globalCommsHandleMutex && GetLastError() == 0);
+
+  SECURITY_ATTRIBUTES attributes = {};
+  attributes.nLength = 12;
+  attributes.lpSecurityDescriptor = 0;
+  attributes.bInheritHandle = 1;
+
+  SetLastError(0);
+  globalCommsFileMappingHandle = CreateFileMappingA((HANDLE)0xFFFFFFFF, &attributes, 4u, 0, strlen(decryptedEmperorDatData) + 1, 0);
+  release_assert(globalCommsFileMappingHandle && GetLastError() == 0);
 }
 
-struct ProcessRunData
+
+PROCESS_INFORMATION runGameExe()
 {
-  char maybeLaunchDir[256];
-  char exeName[256];
-  char maybeLaunchArgs[256];
-  HANDLE processHandle;
-  DWORD processId;
-  HANDLE processHThread;
-  DWORD processThreadId;
-};
-
-
-char __cdecl runCommand(ProcessRunData* gameRunData, bool hook)
-{
-  DWORD lastError; // eax
-  DWORD dwProcessId; // edx
-  HANDLE hThread; // eax
-  DWORD dwThreadId; // ecx
-  struct _PROCESS_INFORMATION ProcessInformation; // [esp+10h] [ebp-358h] BYREF
-  struct _STARTUPINFOA StartupInfo; // [esp+20h] [ebp-348h] BYREF
-  CHAR CommandLine[516]; // [esp+64h] [ebp-304h] BYREF
-  CHAR Buffer[256]; // [esp+268h] [ebp-100h] BYREF
-
-  memset(&StartupInfo, 0, sizeof(StartupInfo));
-  memset(CommandLine, 0, 512u);
-  CommandLine[512] = 0;
-  StartupInfo.cb = sizeof(_STARTUPINFOA);
-  strcpy(CommandLine, gameRunData->exeName);
-  strcat(CommandLine, gameRunData->maybeLaunchArgs);
-
-
-  BOOL runResult = FALSE;
-  if (hook)
+  std::string hookDllPath;
   {
-    std::string hookDllPath;
+    hookDllPath.resize(10);
+    while (true)
     {
-      char temp[MAX_PATH + 1];
       SetLastError(0);
-      GetModuleFileNameA(nullptr, temp, MAX_PATH + 1);
-      release_assert(GetLastError() == 0);
+      DWORD size = GetModuleFileNameA(nullptr, hookDllPath.data(), DWORD(hookDllPath.size()));
+      DWORD err = GetLastError();
 
-      hookDllPath = temp;
-      hookDllPath.resize(hookDllPath.size() - (sizeof("EmperorLauncher.exe") - 1));
-      hookDllPath += "EmperorHooks.dll";
+      if (err == ERROR_INSUFFICIENT_BUFFER)
+      {
+        hookDllPath.resize(hookDllPath.size() * 2);
+        continue;
+      }
+
+      release_assert(err == 0);
+      hookDllPath.resize(size);
+      break;
     }
 
-    runResult = DetourCreateProcessWithDllA(0, CommandLine, 0, 0, 1, 0, 0, 0, &StartupInfo, &ProcessInformation, hookDllPath.c_str(), nullptr);
-  }
-  else
-  {
-    runResult = CreateProcessA(0, CommandLine, 0, 0, 1, 0, 0, 0, &StartupInfo, &ProcessInformation);
+    hookDllPath.resize(hookDllPath.size() - (sizeof("EmperorLauncher.exe") - 1));
+    hookDllPath += "EmperorHooks.dll";
   }
 
-  if (!runResult)
-  {
-    lastError = GetLastError();
-    FormatMessageA(0x1000u, 0, lastError, 0x400u, Buffer, 0x100u, 0);
-    release_assert(false);
-  }
-  dwProcessId = ProcessInformation.dwProcessId;
-  hThread = ProcessInformation.hThread;
-  gameRunData->processHandle = ProcessInformation.hProcess;
-  dwThreadId = ProcessInformation.dwThreadId;
-  gameRunData->processId = dwProcessId;
-  gameRunData->processHThread = hThread;
-  gameRunData->processThreadId = dwThreadId;
-  return 1;
+  std::string commandLine = "Game.exe -w";
+  PROCESS_INFORMATION processInfo = {};
+
+  STARTUPINFOA startupInfo = {};
+  startupInfo.cb = sizeof(STARTUPINFOA);
+
+  release_assert(DetourCreateProcessWithDllA(0, (char*)commandLine.c_str(), 0, 0, 1, 0, 0, 0, &startupInfo, &processInfo, hookDllPath.c_str(), nullptr));
+
+  return processInfo;
 }
 
-void __cdecl sendEmperorDatDataToGameProcessViaAnonymousMapping(HANDLE processHandle, DWORD idThread)
+void sendEmperorDatDataToGameProcessViaAnonymousMapping(HANDLE processHandle, DWORD idThread)
 {
   void* commsMapping = MapViewOfFileEx(globalCommsFileMappingHandle, 0xF001Fu, 0, 0, 0, 0);
   release_assert(commsMapping);
@@ -161,13 +103,13 @@ void __cdecl sendEmperorDatDataToGameProcessViaAnonymousMapping(HANDLE processHa
   CloseHandle(gameReadyEvent);
 }
 
-void waitForExit(ProcessRunData* gameRunData, DWORD* exitCode)
+void waitForExit(PROCESS_INFORMATION* gameRunData, DWORD* exitCode)
 {
-  WaitForSingleObject(gameRunData->processHandle, 0xFFFFFFFF);
+  WaitForSingleObject(gameRunData->hProcess, 0xFFFFFFFF);
   if (exitCode)
     *exitCode = -1;
   if (exitCode)
-    GetExitCodeProcess(gameRunData->processHandle, exitCode);
+    GetExitCodeProcess(gameRunData->hProcess, exitCode);
 }
 
 
@@ -216,16 +158,11 @@ int getMainMonitorHeight()
 int main(int argc, char** argv)
 {
   DWORD doFullscreen = 1;
-  bool hook = true;
   std::string serverAddress;
 
   for (int i = 1; i < argc; i++)
   {
-    if (strcmp(argv[i], "--no-hook") == 0)
-    {
-      hook = false;
-    }
-    else if (strcmp(argv[i], "--windowed") == 0)
+    if (strcmp(argv[i], "--windowed") == 0)
     {
       doFullscreen = 0;
     }
@@ -258,12 +195,9 @@ int main(int argc, char** argv)
 
   createGlobalCommsFileMappingHandle();
 
-  ProcessRunData runGameData = {};
-  strcat(runGameData.exeName, "Game.exe");
-  strcat(runGameData.maybeLaunchArgs, " -w"); // we need windowed mode - higher resolutions don't work in fullscreen
-  runCommand(&runGameData, hook);
+  PROCESS_INFORMATION runGameData = runGameExe();
 
-  sendEmperorDatDataToGameProcessViaAnonymousMapping(runGameData.processHandle, runGameData.processThreadId);
+  sendEmperorDatDataToGameProcessViaAnonymousMapping(runGameData.hProcess, runGameData.dwThreadId);
 
   DWORD ExitCode = 0;
   waitForExit(&runGameData, &ExitCode);
