@@ -635,9 +635,7 @@ void registerWolTypeLibrary()
   HMODULE wolApi = nullptr;
   wolApi = LoadLibraryA("WOL/WOLAPI.DLL");
 
-  // if they don't have the wolapi dll in their game folder, maybe they have it globally installed
-  if (!wolApi)
-    return;
+  release_assert(wolApi);
 
   PFN_DllRegisterServer wolApiRegisterServer = (PFN_DllRegisterServer)GetProcAddress(wolApi, "DllRegisterServer");
   release_assert(wolApiRegisterServer);
@@ -645,7 +643,7 @@ void registerWolTypeLibrary()
   OaEnablePerUserTLibRegistration();
 
   HKEY key = nullptr;
-  release_assert(RegCreateKeyA(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\HKCR", &key) == ERROR_SUCCESS);
+  release_assert(RegCreateKeyA(HKEY_CURRENT_USER, "Software\\Classes", &key) == ERROR_SUCCESS);
   release_assert(RegOverridePredefKey(HKEY_CLASSES_ROOT, key) == ERROR_SUCCESS);
   RegCloseKey(key);
 
