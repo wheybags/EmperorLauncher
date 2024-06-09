@@ -33,6 +33,10 @@ int __stdcall wndProcDuneIIIPatched(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM l
     }
   }
 
+  // Something in WOLAPI likes to hang on exit, so let's just *really* make sure we exit
+  if (Msg == WM_DESTROY)
+    TerminateProcess(GetCurrentProcess(), 0);
+
   return wndProcDuneIIIOrig(hWnd, Msg, wParam, lParam);
 }
 
