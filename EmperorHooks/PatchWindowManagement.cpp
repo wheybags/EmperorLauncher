@@ -161,11 +161,8 @@ void captureCursorLoop()
     if (!mainWindowHandle)
       continue;
 
-    if (!emperorLauncherDoFullscreen)
-    {
-      if (mainWindowHandle != GetForegroundWindow())
-        continue;
-    }
+    if (mainWindowHandle != GetForegroundWindow())
+      continue;
 
     RECT rect = {};
     if (!GetClientRect(mainWindowHandle, &rect))
