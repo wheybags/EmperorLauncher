@@ -50,6 +50,12 @@
     <ClInclude Include="PatchWindowManagement.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="WolServer.hpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Misc.hpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -83,6 +89,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="PatchWol.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="WolServer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Misc.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

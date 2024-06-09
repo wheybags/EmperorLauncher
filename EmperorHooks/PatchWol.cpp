@@ -49,6 +49,7 @@ static PFN_WSAAsyncSelect WSAAsyncSelect_orig = nullptr;
 static PFN_connect connect_orig = nullptr;
 static PFN_send send_orig = nullptr;
 static PFN_recv recv_orig = nullptr;
+static PFN_gethostbyname gethostbyname_orig = nullptr;
 
 
 class Proxy
@@ -65,12 +66,14 @@ public:
   int connect_override(SOCKET s, const struct sockaddr* name, int namelen);
   int send_override(SOCKET s, const char* buf, int len, int flags);
   int recv_override(SOCKET s, char* buf, int len, int flags);
+  struct hostent* gethostbyname_override(const char* name);
 
 protected:
   virtual int forwardSend(SOCKET s, const char* buf, int len, int flags, const struct sockaddr* to, int tolen, SOCKET forwardSock, sockaddr_in& forwardTo);
 
   std::mutex mutex;
   std::map<u_short, std::queue<ReceivedPacket>> receivedPacketsByPort;
+  in_addr servservAddr = {};
 
   struct SocketData
   {
@@ -269,6 +272,31 @@ int Proxy::recv_override(SOCKET s, char* buf, int len, int flags)
   return ret;
 }
 
+struct hostent* Proxy::gethostbyname_override(const char* name)
+{
+  if (strcmp(name, "servserv.westwood.com") == 0)
+  {
+    static thread_local hostent host = {};
+    static thread_local in_addr addr = {};
+    static thread_local in_addr* addrList[] = {&addr, nullptr};
+    static thread_local char* aliasList[] = { nullptr };
+
+    addr = this->servservAddr;
+
+    host.h_name = (char*)"servserv.westwood.com";
+    host.h_aliases = aliasList;
+    host.h_addrtype = AF_INET;
+    host.h_length = 4;
+    host.h_addr_list = (char**)addrList;
+
+    proxylog("Proxy::gethostbyname_override: %s -> %s\n", name, inet_ntoa(addr));
+
+    return &host;
+  }
+
+  return gethostbyname_orig(name);
+}
+
 int Proxy::forwardSend(SOCKET s, const char* buf, int len, int flags, const struct sockaddr* to, int tolen, SOCKET forwardSock, sockaddr_in& forwardTo)
 {
   constexpr int newPacketBuffSize = 5000;
@@ -335,6 +363,8 @@ void ProxyServer::initialise()
   bindAddress.sin_port = htons(proxyPortH);
 
   release_assert(bind(this->sock, (sockaddr*)&bindAddress, sizeof(sockaddr_in)) == 0);
+
+  this->servservAddr.S_un.S_addr = inet_addr("127.0.119.98");
 }
 
 void ProxyServer::run()
@@ -452,6 +482,8 @@ void ProxyClient::initialise()
   this->serverAddr.sin_family = AF_INET;
   this->serverAddr.sin_port = htons(proxyPortH);
   this->serverAddr.sin_addr.S_un.S_addr = inet_addr(this->serverAddrString.c_str());
+
+  this->servservAddr = this->serverAddr.sin_addr;
 }
 
 void ProxyClient::sendKeepaliveLoop()
@@ -581,6 +613,8 @@ static int PASCAL WSAAsyncSelect_override_static(SOCKET s, HWND hWnd, u_int wMsg
 static int PASCAL connect_override_static(SOCKET s, const struct sockaddr* name, int namelen) { return staticProxy->connect_override(s, name, namelen); }
 static int PASCAL send_override_static(SOCKET s, const char* buf, int len, int flags) { return staticProxy->send_override(s, buf, len, flags); }
 static int PASCAL recv_override_static(SOCKET s, char* buf, int len, int flags) { return staticProxy->recv_override(s, buf, len, flags); }
+static struct hostent* PASCAL gethostbyname_override_static(const char* name) { return staticProxy->gethostbyname_override(name); }
+
 
 typedef HRESULT(__stdcall* PFN_DllRegisterServer)();
 
@@ -627,6 +661,7 @@ void init(Proxy* proxy)
   connect_orig = (PFN_connect)GetProcAddress(wsock, "connect");
   send_orig = (PFN_send)GetProcAddress(wsock, "send");
   recv_orig = (PFN_recv)GetProcAddress(wsock, "recv");
+  gethostbyname_orig = (PFN_gethostbyname)GetProcAddress(wsock, "gethostbyname");
 
   DetourTransactionBegin();
   DetourUpdateThread(GetCurrentThread());
@@ -638,6 +673,7 @@ void init(Proxy* proxy)
   DetourAttach(&(PVOID&)connect_orig, connect_override_static);
   DetourAttach(&(PVOID&)send_orig, send_override_static);
   DetourAttach(&(PVOID&)recv_orig, recv_override_static);
+  DetourAttach(&(PVOID&)gethostbyname_orig, gethostbyname_override_static);
   DetourTransactionCommit();
 
   WSAData wSAData = {};

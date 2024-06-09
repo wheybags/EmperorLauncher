@@ -57,6 +57,8 @@ static PFN_send send_orig = nullptr;
 static PFN_select select_orig = nullptr;
 static PFN_setsockopt setsockopt_orig = nullptr;
 static PFN_ioctlsocket ioctlsocket_orig = nullptr;
+static PFN_gethostbyname gethostbyname_orig = nullptr;
+
 
 static int PASCAL WSAAsyncSelect_wrap(SOCKET s, HWND hWnd, u_int wMsg, long lEvent)
 {
@@ -319,6 +321,19 @@ static int PASCAL ioctlsocket_wrap(SOCKET s, long cmd, u_long* argp)
   return ret;
 }
 
+static struct hostent* PASCAL gethostbyname_wrap(const char* name)
+{
+  netprintf("gethostbyname: %s\n", name);
+
+  struct hostent* ret = gethostbyname_orig(name);
+  int err = WSAGetLastError();
+
+  netprintf("    -> %s %s\n", ret ? (ret->h_name ? ret->h_name : "empty") : "empty", wsaErrorToString(err).c_str());
+
+  WSASetLastError(err);
+  return ret;
+}
+
 void wrapWinsockWithLogging()
 {
   HMODULE wsock = LoadLibraryA("wsock32.dll");
@@ -338,6 +353,7 @@ void wrapWinsockWithLogging()
   select_orig = (PFN_select)GetProcAddress(wsock, "select");
   setsockopt_orig = (PFN_setsockopt)GetProcAddress(wsock, "setsockopt");
   ioctlsocket_orig = (PFN_ioctlsocket)GetProcAddress(wsock, "ioctlsocket");
+  gethostbyname_orig = (PFN_gethostbyname)GetProcAddress(wsock, "gethostbyname");
 
 
   DetourTransactionBegin();
@@ -358,6 +374,7 @@ void wrapWinsockWithLogging()
   DetourAttach(&(PVOID&)select_orig, select_wrap);
   DetourAttach(&(PVOID&)setsockopt_orig, setsockopt_wrap);
   DetourAttach(&(PVOID&)ioctlsocket_orig, ioctlsocket_wrap);
+  DetourAttach(&(PVOID&)gethostbyname_orig, gethostbyname_wrap);
 
   DetourTransactionCommit();
 }

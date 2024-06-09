@@ -22,3 +22,5 @@ typedef int (PASCAL* PFN_send)(SOCKET s, const char* buf, int len, int flags);
 typedef int (PASCAL* PFN_select)(int nfds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, const struct timeval* timeout);
 typedef int (PASCAL* PFN_setsockopt)(SOCKET s, int level, int optname, const char* optval, int optlen);
 typedef int (PASCAL* PFN_ioctlsocket)(SOCKET s, long cmd, u_long* argp);
+typedef struct hostent* (PASCAL* PFN_gethostbyname)(const char* name);
+

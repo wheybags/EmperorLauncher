@@ -15,19 +15,19 @@
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{5311f911-1321-44bd-b3dd-2f94ce2d513a}</ProjectGuid>
     <RootNamespace>EmperorHooks</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -106,6 +106,7 @@ nmake</Command>
     <ClInclude Include="CRC.hpp" />
     <ClInclude Include="Error.hpp" />
     <ClInclude Include="GameExeImports.hpp" />
+    <ClInclude Include="Misc.hpp" />
     <ClInclude Include="PatchWol.hpp" />
     <ClInclude Include="HookD3D7.hpp" />
     <ClInclude Include="DoCdCheck.hpp" />
@@ -115,6 +116,7 @@ nmake</Command>
     <ClInclude Include="PatchDebugLog.hpp" />
     <ClInclude Include="PatchRegistry.hpp" />
     <ClInclude Include="PatchWindowManagement.hpp" />
+    <ClInclude Include="WolServer.hpp" />
     <ClInclude Include="WrapWinsock.hpp" />
   </ItemGroup>
   <ItemGroup>
@@ -122,12 +124,14 @@ nmake</Command>
     <ClCompile Include="HookD3D7.cpp" />
     <ClCompile Include="DoCdCheck.cpp" />
     <ClCompile Include="Log.cpp" />
+    <ClCompile Include="Misc.cpp" />
     <ClCompile Include="PatchWol.cpp" />
     <ClCompile Include="WinsockApi.cpp" />
     <ClCompile Include="PatchD3D7ResolutionLimit.cpp" />
     <ClCompile Include="PatchDebugLog.cpp" />
     <ClCompile Include="PatchRegistry.cpp" />
     <ClCompile Include="PatchWindowManagement.cpp" />
+    <ClCompile Include="WolServer.cpp" />
     <ClCompile Include="WrapWinsock.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
