@@ -38,6 +38,7 @@ struct ForwardedPacketHeader
   uint32_t crc;
   sockaddr_in originalTo;
   u_short originalSourcePortH;
+  uint32_t gameSpeed;
   PacketType type;
 };
 
@@ -70,7 +71,7 @@ public:
   struct hostent* gethostbyname_override(const char* name);
 
 protected:
-  virtual int forwardSend(SOCKET s, const char* buf, int len, int flags, const struct sockaddr* to, int tolen, SOCKET forwardSock, sockaddr_in& forwardTo);
+  int forwardSend(SOCKET s, const char* buf, int len, int flags, const struct sockaddr* to, int tolen, SOCKET forwardSock, sockaddr_in& forwardTo, uint32_t frameLimit=UINT_MAX);
 
   std::mutex mutex;
   std::map<u_short, std::queue<ReceivedPacket>> receivedPacketsByPort;
@@ -298,7 +299,7 @@ struct hostent* Proxy::gethostbyname_override(const char* name)
   return gethostbyname_orig(name);
 }
 
-int Proxy::forwardSend(SOCKET s, const char* buf, int len, int flags, const struct sockaddr* to, int tolen, SOCKET forwardSock, sockaddr_in& forwardTo)
+int Proxy::forwardSend(SOCKET s, const char* buf, int len, int flags, const struct sockaddr* to, int tolen, SOCKET forwardSock, sockaddr_in& forwardTo, uint32_t frameLimit)
 {
   constexpr int newPacketBuffSize = 5000;
   uint8_t newPacketBuff[newPacketBuffSize];
@@ -319,6 +320,7 @@ int Proxy::forwardSend(SOCKET s, const char* buf, int len, int flags, const stru
   ForwardedPacketHeader* header = (ForwardedPacketHeader*)newPacketBuff;
   header->originalTo = to4;
   header->originalSourcePortH = ntohs(sourceSockName.sin_port);
+  header->gameSpeed = frameLimit;
   header->type = PacketType::GamePacket;
 
   uint8_t* packetData = newPacketBuff + sizeof(ForwardedPacketHeader);
@@ -409,7 +411,7 @@ void ProxyServer::run()
 
     if (this->replyAddr.sin_family == AF_UNSPEC)
     {
-      proxylog("got connection from %s\n", sockaddrToString(&from4).c_str());
+      Log("got connection from %s\n", sockaddrToString(&from4).c_str());
       this->replyAddr = from4;
     }
 
@@ -458,7 +460,8 @@ void ProxyServer::sendKeepaliveLoop()
 int ProxyServer::sendto_override(SOCKET s, const char* buf, int len, int flags, const struct sockaddr* to, int tolen)
 {
   release_assert(this->replyAddr.sin_family != AF_UNSPEC);
-  return this->forwardSend(s, buf, len, flags, to, tolen, this->sock, this->replyAddr);
+  int frameLimit = GameOptions_getGameSpeed(&someGlobalThing.optionsStorage->gameOptions);
+  return this->forwardSend(s, buf, len, flags, to, tolen, this->sock, this->replyAddr, frameLimit);
 }
 
 class ProxyClient : public Proxy
@@ -470,6 +473,8 @@ public:
   void run() override;
   bool isServer() override { return false; }
 
+  int getGameSpeedFromHost() const { return this->gameSpeedFromHost.load(); }
+
 private:
   int sendto_override(SOCKET s, const char* buf, int len, int flags, const struct sockaddr* to, int tolen) override;
   void sendKeepaliveLoop();
@@ -478,6 +483,7 @@ private:
   std::string serverAddrString;
   sockaddr_in serverAddr = {};
   SOCKET sock = INVALID_SOCKET;
+  std::atomic<int> gameSpeedFromHost = 6;
 };
 
 
@@ -548,6 +554,8 @@ void ProxyClient::run()
     newPacket.originalFrom = this->serverAddr;
     newPacket.originalFrom.sin_port = htons(header->originalSourcePortH);
     newPacket.originalTo = header->originalTo;
+
+    this->gameSpeedFromHost = header->gameSpeed;
   }
 }
 
@@ -559,48 +567,53 @@ int ProxyClient::sendto_override(SOCKET s, const char* buf, int len, int flags, 
 // This patch forces the in game speed setting to apply to multiplayer games. Unpatched, the game will simply run as fast as the
 // slowest client. The game does some calculation to determine what frame limit to use depending on the speed of all the other
 // clients, then sets it by calling CNetworkAdmin::setFrameLimit (this function). We override this function, and make sure that
-// the frame limit is never set higher than the current speed setting, but we only apply this limitation on the host. The other
-// clients in the game will automatically adjust their speed to match the speed limited host.
+// the frame limit is never set higher than the current speed setting. The host is in control, so on the host we read the game speed
+// setting directly from the game options. We also send the game speed in all server->client packets, so the clients know what speed
+// to use. I tried just setting the limit on the server only, and while it does work, it also causes nasty rubberbanding on the client.
 // original is __thiscall, but we can't declare a thiscall func outside a class, so we fake it with fastcall and an unused edx param
 PFN_CNetworkAdmin_setFrameLimit CNetworkAdmin_setFrameLimitOrig = CNetworkAdmin_setFrameLimit;
-int __fastcall CNetworkAdmin_setFrameLimitPatched(CNetworkAdmin* This, DWORD edx, int value)
+int __fastcall CNetworkAdmin_setFrameLimitPatched(CNetworkAdmin* This, DWORD edx, uint32_t value)
 {
+  uint32_t gameSpeed;
   if (staticProxy->isServer())
-  {
-    // This switch is mostly copied from CNetworkAdmin::setFrameLimitFromGlobalSettings, but without a special case check
-    // that seems to cause crashes when we use it from an unexpected place like this
-    int maxFrameLimit = 0;
-    switch (GameOptions_getGameSpeed(&someGlobalThing.optionsStorage->gameOptions))
-    {
-    case 1u:
-      maxFrameLimit = 8;
-      break;
-    case 2u:
-      maxFrameLimit = 10;
-      break;
-    case 3u:
-      maxFrameLimit = 12;
-      break;
-    case 4u:
-      maxFrameLimit = 15;
-      break;
-    case 5u:
-      maxFrameLimit = 20;
-      break;
-    case 6u:
-      maxFrameLimit = 25;
-      break;
-    case 7u:
-      maxFrameLimit = 30;
-      break;
-    default:
-      maxFrameLimit = -1;
-      break;
-    }
+    gameSpeed = GameOptions_getGameSpeed(&someGlobalThing.optionsStorage->gameOptions);
+  else
+    gameSpeed = ((ProxyClient*)staticProxy)->getGameSpeedFromHost();
 
-    if (value > maxFrameLimit)
-      value = maxFrameLimit;
+
+  // This switch is mostly copied from CNetworkAdmin::setFrameLimitFromGlobalSettings, but without a special case check
+  // that seems to cause crashes when we use it from an unexpected place like this
+  uint32_t maxFrameLimit = 0;
+  switch (gameSpeed)
+  {
+  case 1u:
+    maxFrameLimit = 8;
+    break;
+  case 2u:
+    maxFrameLimit = 10;
+    break;
+  case 3u:
+    maxFrameLimit = 12;
+    break;
+  case 4u:
+    maxFrameLimit = 15;
+    break;
+  case 5u:
+    maxFrameLimit = 20;
+    break;
+  case 6u:
+    maxFrameLimit = 25;
+    break;
+  case 7u:
+    maxFrameLimit = 30;
+    break;
+  default:
+    maxFrameLimit = -1;
+    break;
   }
+
+  if (value > maxFrameLimit)
+    value = maxFrameLimit;
 
   This->frameLimit = value;
   return This->frameLimit;

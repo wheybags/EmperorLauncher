@@ -25,7 +25,7 @@ struct CNetworkAdmin
 {
   IpAndPort ipAndPort;
   DWORD unk;
-  int frameLimit;
+  uint32_t frameLimit;
   float somethingRelatedToFrameLimit;
   DWORD unk6;
   DWORD latency;
