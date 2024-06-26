@@ -111,6 +111,7 @@ nmake</Command>
     <ClInclude Include="HookD3D7.hpp" />
     <ClInclude Include="DoCdCheck.hpp" />
     <ClInclude Include="Log.hpp" />
+    <ClInclude Include="Settings.hpp" />
     <ClInclude Include="WinsockApi.hpp" />
     <ClInclude Include="PatchD3D7ResolutionLimit.hpp" />
     <ClInclude Include="PatchDebugLog.hpp" />

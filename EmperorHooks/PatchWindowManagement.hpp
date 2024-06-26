@@ -1,3 +1,3 @@
 #pragma once
 
-void patchWindowManagement(bool doFullscreen);
+void patchWindowManagement(bool doFullscreen, bool doCursorCapture);

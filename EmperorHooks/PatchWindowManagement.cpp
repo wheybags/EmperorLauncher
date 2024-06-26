@@ -187,7 +187,7 @@ void captureCursorLoop()
   }
 }
 
-void patchWindowManagement(bool doFullscreen)
+void patchWindowManagement(bool doFullscreen, bool doCursorCapture)
 {
   DetourTransactionBegin();
   DetourUpdateThread(GetCurrentThread());
@@ -203,5 +203,6 @@ void patchWindowManagement(bool doFullscreen)
     std::thread([]() { backgroundWindowLoop(); }).detach();
   }
 
-  std::thread([]() { captureCursorLoop(); }).detach();
+  if (doCursorCapture)
+    std::thread([]() { captureCursorLoop(); }).detach();
 }

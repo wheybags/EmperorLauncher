@@ -2,6 +2,10 @@
 #include <detours.h>
 #include <cstdio>
 #include <string>
+#include <CommCtrl.h>
+#include <map>
+#include <optional>
+#include "../EmperorHooks/Settings.hpp"
 
 #define release_assert(X) if (!(X)) do { MessageBoxA(nullptr, "assert failed", "assert failed", 0); abort(); } while (0)
 
@@ -155,54 +159,232 @@ int getMainMonitorHeight()
   return info.rcMonitor.bottom - info.rcMonitor.top;
 }
 
-int main(int argc, char** argv)
+
+
+WNDPROC defWndProc = nullptr;
+HWND window = nullptr;
+
+HWND fullscreenCheckbox = nullptr;
+HWND hostGameRadio = nullptr;
+HWND connectToServerRadio = nullptr;
+HWND serverAddressTextbox = nullptr;
+HWND playButton = nullptr;
+
+HWND pauseOnStartupCheckbox = nullptr;
+HWND forceCursorVisibleCheckbox = nullptr;
+HWND disableCursorCaptureCheckbox = nullptr;
+
+bool playClicked = false;
+
+Settings settings;
+
+
+void refreshServerAddressTextboxEnabled()
 {
-  DWORD doFullscreen = 1;
-  std::string serverAddress;
+  bool checked = SendMessage(connectToServerRadio, BM_GETCHECK, 0, 0) == BST_CHECKED;
+  if (checked)
+    EnableWindow(serverAddressTextbox, true);
+  else
+    EnableWindow(serverAddressTextbox, false);
+}
 
-  for (int i = 1; i < argc; i++)
-  {
-    if (strcmp(argv[i], "--windowed") == 0)
-    {
-      doFullscreen = 0;
-    }
-    else if (strcmp(argv[i], "--connect") == 0)
-    {
-      release_assert(i + 1 < argc);
-      serverAddress = argv[i + 1];
-      i++;
-    }
-    else
-    {
-      release_assert(false);
-    }
-  }
 
+void loadAndApplySettings()
+{
+  settings.readSettings();
+
+  SendMessage(fullscreenCheckbox, BM_SETCHECK, settings.fullscreen ? BST_CHECKED : BST_UNCHECKED, 0);
+  SendMessage(hostGameRadio, BM_SETCHECK, settings.hostGame ? BST_CHECKED : BST_UNCHECKED, 0);
+  SendMessage(connectToServerRadio, BM_SETCHECK, settings.hostGame ? BST_UNCHECKED : BST_CHECKED, 0);
+  SendMessageA(serverAddressTextbox, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(settings.serverAddress.c_str()));
+
+  refreshServerAddressTextboxEnabled();
+}
+
+
+LRESULT onServerOrClientRadioClicked(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
+  settings.hostGame = SendMessage(hostGameRadio, BM_GETCHECK, 0, 0) == BST_CHECKED;
+  settings.writeSettings();
+
+  refreshServerAddressTextboxEnabled();
+  return CallWindowProc(defWndProc, hwnd, message, wParam, lParam);
+}
+
+LRESULT onFullscreenCheckboxClicked(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+  settings.fullscreen = SendMessage(fullscreenCheckbox, BM_GETCHECK, 0, 0) == BST_CHECKED;
+  settings.writeSettings();
+
+  return CallWindowProc(defWndProc, hwnd, message, wParam, lParam);
+}
+
+std::string GetText(HWND hwnd)
+{
+  size_t size = SendMessageA(hwnd, WM_GETTEXTLENGTH, 0, 0);
+  if (!size)
+    return "";
+  std::string text(size, '\0');
+  SendMessageA(hwnd, WM_GETTEXT, text.size() + 1, reinterpret_cast<LPARAM>(text.c_str()));
+  return text;
+}
+
+LRESULT onServerAddressTextChanged(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+  settings.serverAddress = GetText(serverAddressTextbox);
+  settings.writeSettings();
+  return CallWindowProc(defWndProc, hwnd, message, wParam, lParam);
+}
+
+LRESULT onPauseOnStartupCheckboxClicked(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+  settings.pauseOnStartup = SendMessage(pauseOnStartupCheckbox, BM_GETCHECK, 0, 0) == BST_CHECKED;
+  settings.writeSettings();
+  return CallWindowProc(defWndProc, hwnd, message, wParam, lParam);
+}
+
+LRESULT onForceCursorVisibleCheckboxClicked(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+  settings.forceCursorVisible = SendMessage(forceCursorVisibleCheckbox, BM_GETCHECK, 0, 0) == BST_CHECKED;
+  settings.writeSettings();
+  return CallWindowProc(defWndProc, hwnd, message, wParam, lParam);
+}
+
+LRESULT onDisableCursorCaptureCheckboxClicked(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+  settings.disableCursorCapture = SendMessage(disableCursorCaptureCheckbox, BM_GETCHECK, 0, 0) == BST_CHECKED;
+  settings.writeSettings();
+  return CallWindowProc(defWndProc, hwnd, message, wParam, lParam);
+}
+
+LRESULT OnWindowClose(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+  PostQuitMessage(0);
+  return CallWindowProc(defWndProc, hwnd, message, wParam, lParam);
+}
+
+LRESULT OnPlayClicked(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+  playClicked = true;
+  DestroyWindow(window);
+  PostQuitMessage(0);
+  return CallWindowProc(defWndProc, hwnd, message, wParam, lParam);
+}
+
+
+LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
+  if (message == WM_CLOSE && hwnd == window) return OnWindowClose(hwnd, message, wParam, lParam);
+
+  if (message == WM_COMMAND && HIWORD(wParam) == BN_CLICKED && reinterpret_cast<HWND>(lParam) == fullscreenCheckbox) return onFullscreenCheckboxClicked(hwnd, message, wParam, lParam);
+  if (message == WM_COMMAND && HIWORD(wParam) == BN_CLICKED && reinterpret_cast<HWND>(lParam) == hostGameRadio) return onServerOrClientRadioClicked(hwnd, message, wParam, lParam);
+  if (message == WM_COMMAND && HIWORD(wParam) == BN_CLICKED && reinterpret_cast<HWND>(lParam) == connectToServerRadio) return onServerOrClientRadioClicked(hwnd, message, wParam, lParam);
+  if (message == WM_COMMAND && HIWORD(wParam) == EN_CHANGE && reinterpret_cast<HWND>(lParam) == serverAddressTextbox) return onServerAddressTextChanged(hwnd, message, wParam, lParam);
+  if (message == WM_COMMAND && HIWORD(wParam) == BN_CLICKED && reinterpret_cast<HWND>(lParam) == playButton) return OnPlayClicked(hwnd, message, wParam, lParam);
+  if (message == WM_COMMAND && HIWORD(wParam) == BN_CLICKED && reinterpret_cast<HWND>(lParam) == pauseOnStartupCheckbox) return onPauseOnStartupCheckboxClicked(hwnd, message, wParam, lParam);
+  if (message == WM_COMMAND && HIWORD(wParam) == BN_CLICKED && reinterpret_cast<HWND>(lParam) == forceCursorVisibleCheckbox) return onForceCursorVisibleCheckboxClicked(hwnd, message, wParam, lParam);
+  if (message == WM_COMMAND && HIWORD(wParam) == BN_CLICKED && reinterpret_cast<HWND>(lParam) == disableCursorCaptureCheckbox) return onDisableCursorCaptureCheckboxClicked(hwnd, message, wParam, lParam);
+
+  return CallWindowProc(defWndProc, hwnd, message, wParam, lParam);
+}
+
+
+int main()
+{
   SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
 
-  int screenHeight = getMainMonitorHeight();
+  // main window
+  int width = 550;
+  int height = 350;
+  int left = GetSystemMetrics(SM_CXSCREEN) / 2 - width / 2;
+  int top = GetSystemMetrics(SM_CYSCREEN) / 2 - height / 2;
+  window = CreateWindowEx(0, WC_DIALOG, L"EmperorLauncher", WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU, left, top, width, height, nullptr, nullptr, nullptr, nullptr);
 
-  if (!doFullscreen)
-    screenHeight = std::max(int(screenHeight * 0.8), 600);
+  int ySpace = 30;
+  int yMax = 0;
 
-  // Lots of stuff in the game assumes a 4:3 screen ratio - I tried to patch this out but I couldn't figure it out for now :(
-  int adjustedScreenWidth = int(float(screenHeight) * 4.0f / 3.0f);
+  // left side
+  {
+    int y = ySpace;
+    int x = 30;
 
-  writeGraphicsSettings(adjustedScreenWidth, screenHeight);
+    CreateWindowEx(0, WC_STATIC, L"Settings", WS_CHILD | WS_VISIBLE, x, y, 200, 24, window, nullptr, nullptr, nullptr);
+    y += ySpace;
 
-  release_assert(RegSetKeyValueA(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\LauncherCustomSettings", "DoFullscreen", REG_DWORD, &doFullscreen, sizeof(DWORD)) == ERROR_SUCCESS);
-  release_assert(RegSetKeyValueA(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\LauncherCustomSettings", "ServerAddress", REG_SZ, serverAddress.data(), DWORD(serverAddress.size())) == ERROR_SUCCESS);
+    fullscreenCheckbox = CreateWindowEx(0, WC_BUTTON, L"Fullscreen", WS_CHILD | BS_AUTOCHECKBOX | WS_VISIBLE, x, y, 104, 24, window, nullptr, nullptr, nullptr);
+    y += ySpace;
+    y += ySpace;
 
-  createGlobalCommsFileMappingHandle();
+    hostGameRadio = CreateWindowEx(0, WC_BUTTON, L"Host game / singleplayer", WS_VISIBLE | WS_CHILD | BS_AUTORADIOBUTTON, x, y, 200, 24, window, nullptr, nullptr, nullptr);
+    y += ySpace;
+    connectToServerRadio = CreateWindowEx(0, WC_BUTTON, L"Connect to server", WS_VISIBLE | WS_CHILD | BS_AUTORADIOBUTTON | WS_GROUP, x, y, 200, 24, window, nullptr, nullptr, nullptr);
+    y += ySpace;
 
-  PROCESS_INFORMATION runGameData = runGameExe();
+    serverAddressTextbox = CreateWindowEx(WS_EX_CLIENTEDGE, WC_EDIT, L"server ip here", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, x, y, 200, 24, window, nullptr, nullptr, nullptr);
+    y += ySpace;
 
-  sendEmperorDatDataToGameProcessViaAnonymousMapping(runGameData.hProcess, runGameData.dwThreadId);
+    yMax = std::max(yMax, y + ySpace);
+  }
 
-  DWORD ExitCode = 0;
-  waitForExit(&runGameData, &ExitCode);
+  // right side
+  {
+    int y = ySpace;
+    int x = 320;
 
-  closeGlobalCommsHandle();
+    CreateWindowEx(0, WC_STATIC, L"Debug settings", WS_CHILD | WS_VISIBLE, x, y, 200, 24, window, nullptr, nullptr, nullptr);
+    y += ySpace;
 
-  return ExitCode;
+    pauseOnStartupCheckbox = CreateWindowEx(0, WC_BUTTON, L"Pause on startup", WS_CHILD | BS_AUTOCHECKBOX | WS_VISIBLE, x, y, 200, 24, window, nullptr, nullptr, nullptr);
+    y += ySpace;
+
+    forceCursorVisibleCheckbox = CreateWindowEx(0, WC_BUTTON, L"Force cursor visible", WS_CHILD | BS_AUTOCHECKBOX | WS_VISIBLE, x, y, 200, 24, window, nullptr, nullptr, nullptr);
+    y += ySpace;
+
+    disableCursorCaptureCheckbox = CreateWindowEx(0, WC_BUTTON, L"Disable cursor capture", WS_CHILD | BS_AUTOCHECKBOX | WS_VISIBLE, x, y, 200, 24, window, nullptr, nullptr, nullptr);
+    y += ySpace;
+
+
+    yMax = std::max(yMax, y + ySpace);
+  }
+
+  playButton = CreateWindowEx(0, WC_BUTTON, L"Play", WS_CHILD | WS_VISIBLE, (width / 2) - 70, yMax, 104, 24, window, nullptr, nullptr, nullptr);
+
+  defWndProc = reinterpret_cast<WNDPROC>(SetWindowLongPtr(window, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(WndProc)));
+
+  loadAndApplySettings();
+
+  ShowWindow(window, SW_SHOW);
+
+  MSG message = { 0 };
+  while (GetMessage(&message, nullptr, 0, 0))
+  {
+    TranslateMessage(&message);
+    DispatchMessage(&message);
+  }
+
+  if (playClicked)
+  {
+    int screenHeight = getMainMonitorHeight();
+
+    if (!settings.fullscreen)
+      screenHeight = std::max(int(screenHeight * 0.8), 600);
+
+    // Lots of stuff in the game assumes a 4:3 screen ratio - I tried to patch this out but I couldn't figure it out for now :(
+    int adjustedScreenWidth = int(float(screenHeight) * 4.0f / 3.0f);
+
+    writeGraphicsSettings(adjustedScreenWidth, screenHeight);
+
+    createGlobalCommsFileMappingHandle();
+
+    PROCESS_INFORMATION runGameData = runGameExe();
+
+    sendEmperorDatDataToGameProcessViaAnonymousMapping(runGameData.hProcess, runGameData.dwThreadId);
+
+    DWORD ExitCode = 0;
+    waitForExit(&runGameData, &ExitCode);
+
+    closeGlobalCommsHandle();
+
+    return ExitCode;
+  }
+
+  return 0;
 }

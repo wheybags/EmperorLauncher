@@ -11,6 +11,8 @@
 #include "Log.hpp"
 #include "PatchWol.hpp"
 #include "Error.hpp"
+#include <optional>
+#include "Settings.hpp"
 
 
 int (WINAPI* TrueShowCursor)(BOOL bShow) = ShowCursor;
@@ -59,25 +61,13 @@ void setupConsole()
   }
 }
 
-
 void runHooks()
 {
-  //MessageBoxA(nullptr, "AAAAA", "AAAA", 0);
+  Settings settings;
+  settings.readSettings();
 
-  DWORD doFullscreen = 0;
-  {
-    DWORD size = sizeof(DWORD);
-    HRESULT result = RegGetValueA(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\LauncherCustomSettings", "DoFullscreen", RRF_RT_REG_DWORD, nullptr, &doFullscreen, &size);
-  }
-
-  std::string serverAddress;
-  {
-    DWORD buffSize = 1024;
-    char buff[1024];
-    HRESULT result = RegGetValueA(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\LauncherCustomSettings", "ServerAddress", RRF_RT_REG_SZ, nullptr, &buff, &buffSize);
-    release_assert(SUCCEEDED(result));
-    serverAddress = buff;
-  }
+  if (settings.pauseOnStartup)
+    MessageBoxA(nullptr, "Press OK to continue", "EmperorHooks", MB_OK);
 
   SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
 
@@ -87,7 +77,10 @@ void runHooks()
   DetourUpdateThread(GetCurrentThread());
   DetourAttach(&(PVOID&)OutputDebugStringAReal, OutputDebugStringAWrap);
   DetourAttach(&(PVOID&)OutputDebugStringWReal, OutputDebugStringWWrap);
-  //DetourAttach(&(PVOID&)TrueShowCursor, FakeShowCursor);
+
+  if (settings.forceCursorVisible)
+    DetourAttach(&(PVOID&)TrueShowCursor, FakeShowCursor);
+
   DetourTransactionCommit();
 
   patchDebugLog();
@@ -95,12 +88,12 @@ void runHooks()
   patchCdCheck();
   patchRedirectRegistry();
   patchD3D7ResolutionLimit();
-  patchWindowManagement(doFullscreen);
+  patchWindowManagement(settings.fullscreen, !settings.disableCursorCapture);
 
   //wrapWinsockWithLogging();
 
-  if (!serverAddress.empty())
-    patchWolAsClient(serverAddress);
+  if (!settings.hostGame)
+    patchWolAsClient(settings.serverAddress);
   else
     patchWolAsServer();
 }

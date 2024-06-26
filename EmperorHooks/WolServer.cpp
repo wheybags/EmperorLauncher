@@ -80,6 +80,8 @@ void WolServer::clientLoop(Connection& connection)
 
   std::string lineBuffer;
 
+  printf("NEW CONNECTION\n");
+
   while (connection.connected)
   {
     int result = recv(connection.socket, buffer.data(), int(buffer.size()), 0);

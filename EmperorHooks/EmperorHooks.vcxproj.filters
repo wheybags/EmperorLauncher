@@ -56,6 +56,9 @@
     <ClInclude Include="Misc.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="Settings.hpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
