@@ -7,6 +7,7 @@ struct SomeNetworkManager;
 struct GlobalStuff;
 struct GraphicsContext;
 struct GameOptions;
+struct CWolWrapper;
 
 struct IpAndPort
 {
@@ -134,6 +135,7 @@ typedef int(__thiscall* PFN_CNetworkAdmin_setFrameLimit)(CNetworkAdmin* This, in
 typedef void(*PFN_CMangler_Pattern_Query)();
 typedef int(__stdcall* PFN_WinMain)(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd);
 typedef DWORD(__thiscall* PFN_GameOptions_getGameSpeed)(GameOptions* This);
+typedef void(__thiscall* PFN_CWolWrapper_ReportResults)(CWolWrapper* This, int a1);
 
 
 #define setupSoundCdPaths ((PFN_setupSoundCdPaths)0x00477220)
@@ -154,6 +156,7 @@ typedef DWORD(__thiscall* PFN_GameOptions_getGameSpeed)(GameOptions* This);
 #define CMangler_Pattern_Query ((PFN_CMangler_Pattern_Query)0x005AC370)
 #define GameExeWinMain ((PFN_WinMain)0x004A73D0)
 #define GameOptions_getGameSpeed ((PFN_GameOptions_getGameSpeed)0x00509A30)
+#define CWolWrapper_ReportResults ((PFN_CWolWrapper_ReportResults)0x00593360)
 
 
 #define IMP(type, address) (*((type*)address))

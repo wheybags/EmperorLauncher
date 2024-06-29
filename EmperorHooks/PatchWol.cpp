@@ -564,6 +564,13 @@ int ProxyClient::sendto_override(SOCKET s, const char* buf, int len, int flags, 
   return this->forwardSend(s, buf, len, flags, to, tolen, this->sock, this->serverAddr);
 }
 
+// Skips attempting to report results to the "gameres" (game results) server. Without this patch, it takes a considerable
+// amount of time after every multiplayer match to time out, and the UI is broken / frozen during this time.
+// original is __thiscall, but we can't declare a thiscall func outside a class, so we fake it with fastcall and an unused edx param
+PFN_CWolWrapper_ReportResults CWolWrapper_ReportResults_Orig = CWolWrapper_ReportResults;
+void __fastcall CWolWrapper_ReportResultsPatched(CWolWrapper* This, DWORD edx, int a1)
+{}
+
 // This patch forces the in game speed setting to apply to multiplayer games. Unpatched, the game will simply run as fast as the
 // slowest client. The game does some calculation to determine what frame limit to use depending on the speed of all the other
 // clients, then sets it by calling CNetworkAdmin::setFrameLimit (this function). We override this function, and make sure that
@@ -682,6 +689,7 @@ void init(Proxy* proxy)
 
   DetourTransactionBegin();
   DetourUpdateThread(GetCurrentThread());
+  DetourAttach(&(PVOID&)CWolWrapper_ReportResults_Orig, CWolWrapper_ReportResultsPatched);
   DetourAttach(&(PVOID&)CNetworkAdmin_setFrameLimitOrig, CNetworkAdmin_setFrameLimitPatched);
   DetourAttach(&(PVOID&)CMangler_Pattern_Query_Orig, CMangler_Pattern_Query_Patched);
   DetourAttach(&(PVOID&)sendto_orig, sendto_override_static);
