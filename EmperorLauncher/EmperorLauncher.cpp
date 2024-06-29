@@ -6,8 +6,11 @@
 #include <map>
 #include <optional>
 #include "../EmperorHooks/Settings.hpp"
-
-#define release_assert(X) if (!(X)) do { MessageBoxA(nullptr, "assert failed", "assert failed", 0); abort(); } while (0)
+#include "../EmperorHooks/Error.hpp"
+#include "Installer.hpp"
+#include "Installer.hpp"
+#include <filesystem>
+#include "md5.h"
 
 
 HANDLE globalCommsFileMappingHandle = nullptr;
@@ -51,33 +54,47 @@ void createGlobalCommsFileMappingHandle()
   release_assert(globalCommsFileMappingHandle && GetLastError() == 0);
 }
 
+std::wstring getFolderThisExeIsIn()
+{
+  std::wstring path;
+  path.resize(4096);
+  while (true)
+  {
+    SetLastError(0);
+    DWORD size = GetModuleFileNameW(nullptr, path.data(), DWORD(path.size()));
+    DWORD err = GetLastError();
+
+    if (err == ERROR_INSUFFICIENT_BUFFER)
+    {
+      path.resize(path.size() * 2);
+      continue;
+    }
+
+    release_assert(err == 0);
+    path.resize(size);
+    break;
+  }
+
+  path.resize(path.size() - sizeof("EmperorLauncher.exe"));
+  return path;
+}
+
+std::optional<std::string> wideToAscii(const std::wstring& wide)
+{
+  std::string ascii;
+  ascii.resize(wide.size());
+  for (size_t i = 0; i < wide.size(); i++)
+  {
+    if (wide[i] > 127)
+      return std::nullopt;
+    ascii[i] = char(wide[i]);
+  }
+  return ascii;
+}
 
 PROCESS_INFORMATION runGameExe()
 {
-  std::string hookDllPath;
-  {
-    hookDllPath.resize(10);
-    while (true)
-    {
-      SetLastError(0);
-      DWORD size = GetModuleFileNameA(nullptr, hookDllPath.data(), DWORD(hookDllPath.size()));
-      DWORD err = GetLastError();
-
-      if (err == ERROR_INSUFFICIENT_BUFFER)
-      {
-        hookDllPath.resize(hookDllPath.size() * 2);
-        continue;
-      }
-
-      release_assert(err == 0);
-      hookDllPath.resize(size);
-      break;
-    }
-
-    hookDllPath.resize(hookDllPath.size() - (sizeof("EmperorLauncher.exe") - 1));
-    hookDllPath += "EmperorHooks.dll";
-  }
-
+  std::string hookDllPath = *wideToAscii(getFolderThisExeIsIn()) + "\\EmperorHooks.dll";
   std::string commandLine = "Game.exe -w";
   PROCESS_INFORMATION processInfo = {};
 
@@ -151,12 +168,16 @@ void writeGraphicsSettings(int screenWidth, int screenHeight)
 
 int getMainMonitorHeight()
 {
+  SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
+
   const POINT ptZero = { 0, 0 };
   HMONITOR monitor = MonitorFromPoint(ptZero, MONITOR_DEFAULTTOPRIMARY);
   MONITORINFO info;
   info.cbSize = sizeof(MONITORINFO);
   GetMonitorInfo(monitor, &info);
   return info.rcMonitor.bottom - info.rcMonitor.top;
+
+  SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_UNAWARE);
 }
 
 
@@ -193,10 +214,13 @@ void loadAndApplySettings()
 {
   settings.readSettings();
 
-  SendMessage(fullscreenCheckbox, BM_SETCHECK, settings.fullscreen ? BST_CHECKED : BST_UNCHECKED, 0);
-  SendMessage(hostGameRadio, BM_SETCHECK, settings.hostGame ? BST_CHECKED : BST_UNCHECKED, 0);
-  SendMessage(connectToServerRadio, BM_SETCHECK, settings.hostGame ? BST_UNCHECKED : BST_CHECKED, 0);
+  SendMessageA(fullscreenCheckbox, BM_SETCHECK, settings.fullscreen ? BST_CHECKED : BST_UNCHECKED, 0);
+  SendMessageA(hostGameRadio, BM_SETCHECK, settings.hostGame ? BST_CHECKED : BST_UNCHECKED, 0);
+  SendMessageA(connectToServerRadio, BM_SETCHECK, settings.hostGame ? BST_UNCHECKED : BST_CHECKED, 0);
   SendMessageA(serverAddressTextbox, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(settings.serverAddress.c_str()));
+  SendMessageA(pauseOnStartupCheckbox, BM_SETCHECK, settings.pauseOnStartup ? BST_CHECKED : BST_UNCHECKED, 0);
+  SendMessageA(forceCursorVisibleCheckbox, BM_SETCHECK, settings.forceCursorVisible ? BST_CHECKED : BST_UNCHECKED, 0);
+  SendMessageA(disableCursorCaptureCheckbox, BM_SETCHECK, settings.disableCursorCapture ? BST_CHECKED : BST_UNCHECKED, 0);
 
   refreshServerAddressTextboxEnabled();
 }
@@ -286,10 +310,81 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) 
   return CallWindowProc(defWndProc, hwnd, message, wParam, lParam);
 }
 
-
-int main()
+std::string getMd5OfFile(const std::string& path)
 {
-  SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
+  FILE* f = fopen(path.c_str(), "rb");
+  if (!f)
+    return "";
+
+  release_assert(fseek(f, 0, SEEK_END) == 0);
+  long size = ftell(f);
+  release_assert(size != -1);
+  release_assert(fseek(f, 0, SEEK_SET) == 0);
+
+  std::vector<uint8_t> data(size);
+  release_assert(fread(data.data(), 1, size, f) == size);
+  fclose(f);
+
+
+  MD5_CTX md5 = {};
+  MD5Init(&md5);
+  MD5Update(&md5, data.data(), uint32_t(data.size()));
+  unsigned char md5Bytes[16];
+  MD5Final(md5Bytes, &md5);
+
+  std::string md5Hex;
+  md5Hex.resize(32);
+
+  for (int32_t i = 0; i < 16; i++)
+    sprintf(md5Hex.data() + i*2, "%02x", md5Bytes[i]);
+
+  return md5Hex;
+}
+
+
+int wmain(int argc, wchar_t* argv[])
+{
+  std::wstring installDirUnicode;
+  if (argc > 1)
+    installDirUnicode = argv[1];
+  else
+    installDirUnicode = getFolderThisExeIsIn() + L"\\data";
+
+  // This is unfortunate, but I just don't want to deal with debugging it.
+  // Pretty sure the base game won't work anyway, even if I fix my code.
+  for (std::wstring item : {installDirUnicode, getFolderThisExeIsIn()})
+  {
+    if (!wideToAscii(item).has_value())
+    {
+      MessageBoxW(nullptr, (item + L" contains non-English characters, please move to a folder with only English characters").c_str(), L"Bad install path", MB_OK);
+      return 1;
+    }
+  }
+
+  std::string installDir = *wideToAscii(installDirUnicode);
+  std::string gameExeMd5 = getMd5OfFile(installDir + "\\Game.exe");
+  std::string_view desiredMd5 = "7dc4fda2f6b7e8a6b70e846686a81938";
+
+  if (gameExeMd5 != desiredMd5)
+  {
+    if (MessageBoxA(nullptr, ("Install to " + installDir + "?").c_str(), "Game data not found or invalid", MB_OKCANCEL) != IDOK)
+      return 0;
+
+    installEmperor(installDir);
+
+    gameExeMd5 = getMd5OfFile(installDir + "\\Game.exe");
+    if (gameExeMd5 != desiredMd5)
+    {
+      MessageBoxA(nullptr, "Installation failed!", "Error", MB_OK);
+      return 1;
+    }
+    else
+    {
+      MessageBoxA(nullptr, "Installation successful!", "Success", MB_OK);
+    }
+  }
+
+  SetCurrentDirectoryA(installDir.c_str());
 
   // main window
   int width = 550;

@@ -18,7 +18,7 @@
 // RegDeleteKeyA
 // RegOpenKeyExA
 
-bool startsWithCaseInsensitive(const char* haystack, const char* needle)
+static bool startsWithCaseInsensitive(const char* haystack, const char* needle)
 {
   if (!*needle && !*haystack)
     return true;
