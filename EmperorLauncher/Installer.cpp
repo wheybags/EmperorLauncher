@@ -313,7 +313,7 @@ MOVIES
 data\movies
 
 MOVIES1
-disks\EMPEROR1\Movies
+disks\EMPEROR2\Movies
 
 MOVIES2
 disks\EMPEROR2\Movies
@@ -343,7 +343,7 @@ SOUNDS
 data\sounds
 
 CD1
-disks\EMPEROR1
+disks\EMPEROR2
 
 CD2
 disks\EMPEROR2
