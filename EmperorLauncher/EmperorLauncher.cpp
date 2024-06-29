@@ -136,34 +136,39 @@ void waitForExit(PROCESS_INFORMATION* gameRunData, DWORD* exitCode)
 
 void writeGraphicsSettings(int screenWidth, int screenHeight)
 {
-  HKEY key = nullptr;
-  HRESULT result = RegCreateKeyExA(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\Options\\Graphics", 0, nullptr, 0, KEY_WRITE, nullptr, &key, nullptr);
-  release_assert(result == S_OK && key);
-
-  auto setValue = [&](const char* valueName, const std::string& value)
+  auto setValue = [&](HKEY hkey, const char* subKey, const char* valueName, const std::string& value, bool force = false)
   {
-    release_assert(RegSetKeyValueA(key, nullptr, valueName, REG_SZ, value.c_str(), DWORD(value.size() + 1)) == ERROR_SUCCESS);
+    if (!force)
+    {
+      LSTATUS err = RegGetValueA(hkey, subKey, valueName, RRF_RT_REG_SZ, nullptr, nullptr, nullptr);
+      if (err == ERROR_SUCCESS)
+        return;
+    }
+    release_assert(RegSetKeyValueA(hkey, subKey, valueName, REG_SZ, value.c_str(), DWORD(value.size() + 1)) == ERROR_SUCCESS);
   };
 
-  setValue("ScreenWidth", std::to_string(screenWidth));
-  setValue("ScreenHeight", std::to_string(screenHeight));
+  // force set width and height, the rest will we be set only if they don't exist
+  setValue(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\Options\\Graphics", "ScreenWidth", std::to_string(screenWidth), true);
+  setValue(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\Options\\Graphics", "ScreenHeight", std::to_string(screenHeight), true);
 
   // Just copied from the registry after cranking all settings in the in game settings dialogue
-  setValue("GraphicsLOD", "4");
-  setValue("ColorDepth", "32");
-  setValue("Shadows", "1");
-  setValue("ModelLOD", "2");
-  setValue("TextureLOD", "0");
-  setValue("TerrainLOD", "2");
-  setValue("EffectLOD", "2");
-  setValue("MultiTexture", "1");
-  setValue("HardwareTL", "1");
-  setValue("AltDevice", "0");
-  setValue("ShadowQuality", "2");
-  setValue("LimitFrameRate", "0"); // this doesn't work, just btw
-  setValue("LimitTo16BitTex", "0");
+  setValue(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\Options\\Graphics", "GraphicsLOD", "4");
+  setValue(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\Options\\Graphics","ColorDepth", "32");
+  setValue(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\Options\\Graphics","Shadows", "1");
+  setValue(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\Options\\Graphics","ModelLOD", "2");
+  setValue(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\Options\\Graphics","TextureLOD", "0");
+  setValue(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\Options\\Graphics","TerrainLOD", "2");
+  setValue(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\Options\\Graphics","EffectLOD", "2");
+  setValue(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\Options\\Graphics","MultiTexture", "1");
+  setValue(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\Options\\Graphics","HardwareTL", "1");
+  setValue(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\Options\\Graphics","AltDevice", "0");
+  setValue(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\Options\\Graphics","ShadowQuality", "2");
+  setValue(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\Options\\Graphics","LimitFrameRate", "0"); // this doesn't work, just btw
+  setValue(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\Options\\Graphics","LimitTo16BitTex", "0");
 
-  RegCloseKey(key);
+  // default to WOL when clicking multiplayer, don't offer LAN
+  setValue(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\Options\\Multiplayer", "AutoLoginChoice", "NoAutoWolRadioButton");
+  setValue(HKEY_CURRENT_USER, "Software\\WestwoodRedirect\\Emperor\\Options\\Multiplayer", "LastLoginNickname", "player");
 }
 
 int getMainMonitorHeight()
