@@ -692,16 +692,24 @@ void WolServer::Connection::handle_GAMEOPT(const std::vector<std::string>& line,
   std::string data = lineStr.substr(line[0].length() + 1 + line[1].length() + 2);
   std::string forwardMessage = ":" + this->nick + "!u@h GAMEOPT " + line[1] + " :" + data;
 
-  if (this->hosting && line[1] == this->nick)
-  {
-    send(this->socket, forwardMessage.data(), int(forwardMessage.size()), 0);
-  }
-  else
+
+  if (line[1].starts_with("#"))
   {
     for (int32_t i = 0; i < int32_t(this->connectedToChannel->hostChannelMembers.size()); i++)
     {
       if (this->connectedToChannel->hostChannelMembers[i] != this)
         send(this->connectedToChannel->hostChannelMembers[i]->socket, forwardMessage.data(), int(forwardMessage.size()), 0);
+    }
+  }
+  else
+  {
+    for (int32_t i = 0; i < int32_t(this->connectedToChannel->hostChannelMembers.size()); i++)
+    {
+      if (line[1] == this->connectedToChannel->hostChannelMembers[i]->nick)
+      {
+        send(this->connectedToChannel->hostChannelMembers[i]->socket, forwardMessage.data(), int(forwardMessage.size()), 0);
+        break;
+      }
     }
   }
 }

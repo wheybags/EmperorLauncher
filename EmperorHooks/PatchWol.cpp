@@ -20,6 +20,13 @@
 
 constexpr u_short proxyPortH = 1337;
 
+struct PortRange
+{
+  u_short startH;
+  u_short endH;
+};
+std::atomic<PortRange> portRange = PortRange{ 0, 0 };
+
 struct ReceivedPacket
 {
   std::vector<uint8_t> data;
@@ -38,8 +45,11 @@ struct ForwardedPacketHeader
   uint32_t crc;
   sockaddr_in originalTo;
   u_short originalSourcePortH;
-  uint32_t gameSpeed;
+  in_addr originalSourceAddr; // only used for host->client packets
+  uint32_t gameSpeed; // only used for host->client packets
   PacketType type;
+  uint16_t portRangeStartH = 0;
+  uint16_t portRangeEndH = 0;
 };
 
 class Proxy;
@@ -71,7 +81,7 @@ public:
   struct hostent* gethostbyname_override(const char* name);
 
 protected:
-  int forwardSend(SOCKET s, const char* buf, int len, int flags, const struct sockaddr* to, int tolen, SOCKET forwardSock, sockaddr_in& forwardTo, uint32_t frameLimit=UINT_MAX);
+  int forwardSend(uint16_t originalSourcePortH, const char* buf, int len, int flags, const struct sockaddr* to, int tolen, SOCKET forwardSock, sockaddr_in& forwardTo, uint32_t frameLimit = UINT_MAX, in_addr originalSourceAddr={});
 
   std::mutex mutex;
   std::map<u_short, std::queue<ReceivedPacket>> receivedPacketsByPort;
@@ -146,7 +156,7 @@ int Proxy::recvfrom_override(SOCKET s, char* buf, int len, int flags, struct soc
   release_assert(getsockname(s, (sockaddr*)&boundAddr, &size) == 0);
 
   int portH = ntohs(boundAddr.sin_port);
-  proxylog("Proxy::recvfrom_override socket: %u, len: %d, flags: %d, port: %d\n", s, len, flags, portH);
+  //proxylog("Proxy::recvfrom_override socket: %u, len: %d, flags: %d, port: %d\n", s, len, flags, portH);
 
   auto it = this->receivedPacketsByPort.find(portH);
   if (it != this->receivedPacketsByPort.end() && !it->second.empty())
@@ -169,12 +179,13 @@ int Proxy::recvfrom_override(SOCKET s, char* buf, int len, int flags, struct soc
     if (!it->second.empty() && socketData && socketData->isAsyncSelectRegistered)
       socketData->sendReadEvent();
 
+    proxylog("Proxy::recvfrom_override socket: %u, len: %d, flags: %d, port: %d\n", s, len, flags, portH);
     proxylog("    -> SUCCESS %d\n", retval);
     WSASetLastError(0);
     return retval;
   }
 
-  proxylog("    -> WSAEWOULDBLOCK -1\n");
+  //proxylog("    -> WSAEWOULDBLOCK -1\n");
   WSASetLastError(WSAEWOULDBLOCK);
   return SOCKET_ERROR;
 
@@ -299,7 +310,7 @@ struct hostent* Proxy::gethostbyname_override(const char* name)
   return gethostbyname_orig(name);
 }
 
-int Proxy::forwardSend(SOCKET s, const char* buf, int len, int flags, const struct sockaddr* to, int tolen, SOCKET forwardSock, sockaddr_in& forwardTo, uint32_t frameLimit)
+int Proxy::forwardSend(uint16_t originalSourcePortH, const char* buf, int len, int flags, const struct sockaddr* to, int tolen, SOCKET forwardSock, sockaddr_in& forwardTo, uint32_t frameLimit, in_addr originalSourceAddr)
 {
   constexpr int newPacketBuffSize = 5000;
   uint8_t newPacketBuff[newPacketBuffSize];
@@ -311,17 +322,20 @@ int Proxy::forwardSend(SOCKET s, const char* buf, int len, int flags, const stru
   release_assert(to->sa_family == AF_INET);
 
   sockaddr_in to4 = *((sockaddr_in*)to);
-  sockaddr_in sourceSockName = {};
-  int size = sizeof(sockaddr_in);
-  getsockname(s, (sockaddr*)&sourceSockName, &size);
 
-  proxylog("Proxy::forwardSend: socket: %u, bindPort: %d, len: %d, flags: %d to: %s\n", s, (int)htons(sourceSockName.sin_port), len, flags, sockaddrToString(to).c_str());
+
+  proxylog("Proxy::forwardSend: originalSourcePort: %u, len: %d, flags: %d to: %s\n", originalSourcePortH, len, flags, sockaddrToString(to).c_str());
 
   ForwardedPacketHeader* header = (ForwardedPacketHeader*)newPacketBuff;
   header->originalTo = to4;
-  header->originalSourcePortH = ntohs(sourceSockName.sin_port);
+  header->originalSourcePortH = originalSourcePortH;
+  header->originalSourceAddr = originalSourceAddr;
   header->gameSpeed = frameLimit;
   header->type = PacketType::GamePacket;
+
+  PortRange range = portRange.load();
+  header->portRangeStartH = range.startH;
+  header->portRangeEndH = range.endH;
 
   uint8_t* packetData = newPacketBuff + sizeof(ForwardedPacketHeader);
   memcpy(packetData, buf, len);
@@ -351,7 +365,16 @@ private:
 
 private:
   SOCKET sock = INVALID_SOCKET;
-  sockaddr_in replyAddr = {};
+
+  struct ClientData
+  {
+    sockaddr_in realReplyAddr;
+
+    uint16_t virtualPortRangeStartH = 0;
+    uint16_t virtualPortRangeEndH = 0;
+  };
+
+  std::vector<ClientData> clients;
 };
 
 void ProxyServer::initialise()
@@ -367,7 +390,7 @@ void ProxyServer::initialise()
 
   release_assert(bind(this->sock, (sockaddr*)&bindAddress, sizeof(sockaddr_in)) == 0);
 
-  this->servservAddr.S_un.S_addr = inet_addr("127.0.119.98");
+  this->servservAddr.S_un.S_addr = inet_addr("127.0.0.1");
 
   std::thread([]() {
     WolServer wolServer;
@@ -405,40 +428,98 @@ void ProxyServer::run()
     ForwardedPacketHeader* header = (ForwardedPacketHeader*)buff;
 
     if (crcReal != header->crc)
+    {
+      proxylog("crc mismatch\n");
       continue;
+    }
 
     proxylog("ProxyServer::run: got packet from: %s, originalTo: %s\n", sockaddrToString(&from4).c_str(), sockaddrToString(&header->originalTo).c_str());
 
-    if (this->replyAddr.sin_family == AF_UNSPEC)
+    ClientData* fromClient = nullptr;
+    for (int32_t i = 0; i < int32_t(this->clients.size()); i++)
     {
-      Log("got connection from %s\n", sockaddrToString(&from4).c_str());
-      this->replyAddr = from4;
+      if (from4.sin_addr.S_un.S_addr == this->clients[i].realReplyAddr.sin_addr.S_un.S_addr && from4.sin_port == this->clients[i].realReplyAddr.sin_port)
+      {
+        fromClient = &this->clients[i];
+        break;
+      }
     }
 
-    if (header->type != PacketType::GamePacket)
-      continue;
-
-    uint8_t* originalData = buff + sizeof(ForwardedPacketHeader);
-    int originalDataSize = bytesRead - sizeof(ForwardedPacketHeader);
-
-    std::scoped_lock lock(this->mutex);
-
-    u_short destPortH = ntohs(header->originalTo.sin_port);
-    ReceivedPacket& newPacket = this->receivedPacketsByPort[destPortH].emplace();
-    newPacket.data = std::vector<uint8_t>(originalData, originalData + originalDataSize);
-    newPacket.originalFrom = from4;
-    newPacket.originalFrom.sin_port = htons(header->originalSourcePortH);
-    newPacket.originalTo = header->originalTo;
-
-
-    for (SocketData& socketData : this->sockets)
+    if (!fromClient)
     {
-      if (socketData.isAsyncSelectRegistered &&
-        socketData.bindAddr.has_value() &&
-        ntohs(socketData.bindAddr->sin_port) == destPortH &&
-        !socketData.readEventSent)
+      Log("got connection from %s\n", sockaddrToString(&from4).c_str());
+      fromClient = &clients.emplace_back();
+      fromClient->realReplyAddr = from4;
+    }
+
+
+    if (header->type == PacketType::GamePacket)
+    {
+      if (fromClient->virtualPortRangeStartH != header->portRangeStartH || fromClient->virtualPortRangeEndH != header->portRangeEndH)
       {
-        socketData.sendReadEvent();
+        proxylog("updating port range for client %s:%d: %d-%d\n", inet_ntoa(from4.sin_addr), ntohs(from4.sin_port), header->portRangeStartH, header->portRangeEndH);
+        fromClient->virtualPortRangeStartH = header->portRangeStartH;
+        fromClient->virtualPortRangeEndH = header->portRangeEndH;
+      }
+
+      uint8_t* originalData = buff + sizeof(ForwardedPacketHeader);
+      int originalDataSize = bytesRead - sizeof(ForwardedPacketHeader);
+      std::scoped_lock lock(this->mutex);
+
+
+      // packet is for this server
+      if (header->originalTo.sin_addr.S_un.S_addr == this->servservAddr.S_un.S_addr)
+      {
+        u_short destPortH = ntohs(header->originalTo.sin_port);
+        ReceivedPacket& newPacket = this->receivedPacketsByPort[destPortH].emplace();
+        newPacket.data = std::vector<uint8_t>(originalData, originalData + originalDataSize);
+        newPacket.originalFrom = from4;
+        newPacket.originalFrom.sin_port = htons(header->originalSourcePortH);
+        newPacket.originalTo = header->originalTo;
+
+
+        for (SocketData& socketData : this->sockets)
+        {
+          if (socketData.isAsyncSelectRegistered &&
+            socketData.bindAddr.has_value() &&
+            ntohs(socketData.bindAddr->sin_port) == destPortH &&
+            !socketData.readEventSent)
+          {
+            socketData.sendReadEvent();
+          }
+        }
+      }
+      else // packet is for another client?
+      {
+        ClientData* destClient = nullptr;
+        for (int32_t i = 0; i < int32_t(this->clients.size()); i++)
+        {
+          ClientData* temp = &this->clients[i];
+          if (header->originalTo.sin_addr.S_un.S_addr == temp->realReplyAddr.sin_addr.S_un.S_addr && ntohs(header->originalTo.sin_port) >= temp->virtualPortRangeStartH && ntohs(header->originalTo.sin_port) <= temp->virtualPortRangeEndH)
+          {
+            destClient = temp;
+            break;
+          }
+        }
+
+        if (destClient)
+        {
+          header->originalSourceAddr = from4.sin_addr;
+          header->crc = CRC::Calculate(buff + 4, bytesRead - 4, CRC::CRC_32());
+
+
+          proxylog("forwarding packet, originalSourceAddr: %s, originalSourcePortH: %u, originalTo: %s\n",
+                    in_addr_to_string(header->originalSourceAddr).c_str(),
+                    header->originalSourcePortH,
+                    sockaddrToString(&header->originalTo).c_str());
+
+
+          sendto_orig(this->sock, (const char*)buff, bytesRead, 0, (sockaddr*)&destClient->realReplyAddr, sizeof(sockaddr_in));
+        }
+        else
+        {
+          proxylog("got packet for unknown destination %s:%d\n", inet_ntoa(header->originalTo.sin_addr), ntohs(header->originalTo.sin_port));
+        }
       }
     }
   }
@@ -448,10 +529,13 @@ void ProxyServer::sendKeepaliveLoop()
 {
   while (true)
   {
-    ForwardedPacketHeader keepalivePacket = {};
-    keepalivePacket.type = PacketType::KeepAlive;
-    keepalivePacket.crc = CRC::Calculate(&keepalivePacket + 4, sizeof(ForwardedPacketHeader) - 4, CRC::CRC_32());
-    sendto_orig(this->sock, (const char*)&keepalivePacket, sizeof(ForwardedPacketHeader), 0, (sockaddr*)&this->replyAddr, sizeof(this->replyAddr));
+    for (int32_t i = 0; i < int32_t(this->clients.size()); i++)
+    {
+      ForwardedPacketHeader keepalivePacket = {};
+      keepalivePacket.type = PacketType::KeepAlive;
+      keepalivePacket.crc = CRC::Calculate(&keepalivePacket + 4, sizeof(ForwardedPacketHeader) - 4, CRC::CRC_32());
+      sendto_orig(this->sock, (const char*)&keepalivePacket, sizeof(ForwardedPacketHeader), 0, (sockaddr*)&this->clients[i].realReplyAddr, sizeof(this->clients[i].realReplyAddr));
+    }
 
     Sleep(1000 * 10);
   }
@@ -459,9 +543,35 @@ void ProxyServer::sendKeepaliveLoop()
 
 int ProxyServer::sendto_override(SOCKET s, const char* buf, int len, int flags, const struct sockaddr* to, int tolen)
 {
-  release_assert(this->replyAddr.sin_family != AF_UNSPEC);
+  sockaddr_in* to4 = (sockaddr_in*)to;
+  uint16_t toPortH = ntohs(to4->sin_port);
+
+  ClientData* client = nullptr;
+
+  for (int32_t i = 0; i < int32_t(this->clients.size()); i++)
+  {
+    ClientData* temp = &this->clients[i];
+    if (temp->realReplyAddr.sin_addr.S_un.S_addr == to4->sin_addr.S_un.S_addr && toPortH >= temp->virtualPortRangeStartH && toPortH <= temp->virtualPortRangeEndH)
+    {
+      client = &this->clients[i];
+      break;
+    }
+  }
+
+  if (!client)
+  {
+    proxylog("ProxyServer::sendto_override: no client found for %s:%d\n", inet_ntoa(to4->sin_addr), toPortH);
+    return len;
+  }
+
   int frameLimit = GameOptions_getGameSpeed(&someGlobalThing.optionsStorage->gameOptions);
-  return this->forwardSend(s, buf, len, flags, to, tolen, this->sock, this->replyAddr, frameLimit);
+
+
+  sockaddr_in sourceSockName = {};
+  int size = sizeof(sockaddr_in);
+  getsockname(s, (sockaddr*)&sourceSockName, &size);
+
+  return this->forwardSend(ntohs(sourceSockName.sin_port), buf, len, flags, to, tolen, this->sock, client->realReplyAddr, frameLimit, this->servservAddr);
 }
 
 class ProxyClient : public Proxy
@@ -536,9 +646,12 @@ void ProxyClient::run()
     ForwardedPacketHeader* header = (ForwardedPacketHeader*)buff;
 
     if (crcReal != header->crc)
+    {
+      proxylog("crc mismatch\n");
       continue;
+    }
 
-    proxylog("ProxyClient::run: got packet from server: %s, originalTo: %s\n", sockaddrToString(&this->serverAddr).c_str(), sockaddrToString(&header->originalTo).c_str());
+    proxylog("ProxyClient::run: got packet from: %s:%d, originalTo: %s\n", in_addr_to_string(header->originalSourceAddr).c_str(), header->originalSourcePortH, sockaddrToString(&header->originalTo).c_str());
 
     if (header->type != PacketType::GamePacket)
       continue;
@@ -551,7 +664,8 @@ void ProxyClient::run()
     u_short destPortH = ntohs(header->originalTo.sin_port);
     ReceivedPacket& newPacket = this->receivedPacketsByPort[destPortH].emplace();
     newPacket.data = std::vector<uint8_t>(originalData, originalData + originalDataSize);
-    newPacket.originalFrom = this->serverAddr;
+    newPacket.originalFrom.sin_family = AF_INET;
+    newPacket.originalFrom.sin_addr = header->originalSourceAddr;
     newPacket.originalFrom.sin_port = htons(header->originalSourcePortH);
     newPacket.originalTo = header->originalTo;
 
@@ -561,7 +675,11 @@ void ProxyClient::run()
 
 int ProxyClient::sendto_override(SOCKET s, const char* buf, int len, int flags, const struct sockaddr* to, int tolen)
 {
-  return this->forwardSend(s, buf, len, flags, to, tolen, this->sock, this->serverAddr);
+  sockaddr_in sourceSockName = {};
+  int size = sizeof(sockaddr_in);
+  getsockname(s, (sockaddr*)&sourceSockName, &size);
+
+  return this->forwardSend(ntohs(sourceSockName.sin_port), buf, len, flags, to, tolen, this->sock, this->serverAddr);
 }
 
 // Skips attempting to report results to the "gameres" (game results) server. Without this patch, it takes a considerable
@@ -633,6 +751,13 @@ void CMangler_Pattern_Query_Patched()
   return;
 }
 
+PFN_CPortUtil_Set_Port_Range CPortUtil_Set_Port_Range_Orig = CPortUtil_Set_Port_Range;
+void CPortUtil_Set_Port_Range_Patched(unsigned __int16 port_h_min, unsigned __int16 port_h_max)
+{
+  portRange = { port_h_min, port_h_max };
+  CPortUtil_Set_Port_Range_Orig(port_h_min, port_h_max);
+}
+
 static int PASCAL sendto_override_static(SOCKET s, const char* buf, int len, int flags, const struct sockaddr* to, int tolen) { return staticProxy->sendto_override(s, buf, len, flags, to, tolen); }
 static int PASCAL recvfrom_override_static(SOCKET s, char* buf, int len, int flags, struct sockaddr* from, int* fromlen) { return staticProxy->recvfrom_override(s, buf, len, flags, from, fromlen); }
 static int PASCAL WSAAsyncSelect_override_static(SOCKET s, HWND hWnd, u_int wMsg, long lEvent) { return staticProxy->WSAAsyncSelect_override(s, hWnd, wMsg, lEvent); }
@@ -692,6 +817,7 @@ void init(Proxy* proxy)
   DetourAttach(&(PVOID&)CWolWrapper_ReportResults_Orig, CWolWrapper_ReportResultsPatched);
   DetourAttach(&(PVOID&)CNetworkAdmin_setFrameLimitOrig, CNetworkAdmin_setFrameLimitPatched);
   DetourAttach(&(PVOID&)CMangler_Pattern_Query_Orig, CMangler_Pattern_Query_Patched);
+  DetourAttach(&(PVOID&)CPortUtil_Set_Port_Range_Orig, CPortUtil_Set_Port_Range_Patched);
   DetourAttach(&(PVOID&)sendto_orig, sendto_override_static);
   DetourAttach(&(PVOID&)recvfrom_orig, recvfrom_override_static);
   DetourAttach(&(PVOID&)WSAAsyncSelect_orig, WSAAsyncSelect_override_static);

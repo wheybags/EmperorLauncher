@@ -2,6 +2,7 @@
 #include <string>
 #include <winsock.h>
 
+std::string in_addr_to_string(const in_addr& addr);
 std::string sockaddrToString(const sockaddr_in* addr);
 std::string sockaddrToString(const sockaddr* addr);
 std::string socketToString(SOCKET s);

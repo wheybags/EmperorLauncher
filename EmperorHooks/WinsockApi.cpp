@@ -1,8 +1,14 @@
 #include "WinsockApi.hpp"
 
+
+std::string in_addr_to_string(const in_addr& addr)
+{
+  return std::string(inet_ntoa(addr));
+}
+
 std::string sockaddrToString(const sockaddr_in* addr)
 {
-  return std::string(inet_ntoa(addr->sin_addr)) + ":" + std::to_string(ntohs(addr->sin_port));
+  return std::string(in_addr_to_string(addr->sin_addr)) + ":" + std::to_string(ntohs(addr->sin_port));
 }
 
 std::string sockaddrToString(const sockaddr* addr)

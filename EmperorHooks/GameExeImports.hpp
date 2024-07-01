@@ -136,6 +136,7 @@ typedef void(*PFN_CMangler_Pattern_Query)();
 typedef int(__stdcall* PFN_WinMain)(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd);
 typedef DWORD(__thiscall* PFN_GameOptions_getGameSpeed)(GameOptions* This);
 typedef void(__thiscall* PFN_CWolWrapper_ReportResults)(CWolWrapper* This, int a1);
+typedef void(__cdecl* PFN_CPortUtil_Set_Port_Range)(unsigned __int16 port_h_min, unsigned __int16 port_h_max);
 
 
 #define setupSoundCdPaths ((PFN_setupSoundCdPaths)0x00477220)
@@ -157,7 +158,7 @@ typedef void(__thiscall* PFN_CWolWrapper_ReportResults)(CWolWrapper* This, int a
 #define GameExeWinMain ((PFN_WinMain)0x004A73D0)
 #define GameOptions_getGameSpeed ((PFN_GameOptions_getGameSpeed)0x00509A30)
 #define CWolWrapper_ReportResults ((PFN_CWolWrapper_ReportResults)0x00593360)
-
+#define CPortUtil_Set_Port_Range ((PFN_CPortUtil_Set_Port_Range)0x005AEF60)
 
 #define IMP(type, address) (*((type*)address))
 #define somethingThatControlsExitingCdCheckLoop IMP(int, 0x007CBC68)
