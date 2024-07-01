@@ -81,9 +81,9 @@ public:
   struct hostent* gethostbyname_override(const char* name);
 
 protected:
-  int forwardSend(uint16_t originalSourcePortH, const char* buf, int len, int flags, const struct sockaddr* to, int tolen, SOCKET forwardSock, sockaddr_in& forwardTo, uint32_t frameLimit = UINT_MAX, in_addr originalSourceAddr={});
+  static int forwardSend(uint16_t originalSourcePortH, const char* buf, int len, int flags, const struct sockaddr* to, int tolen, SOCKET forwardSock, sockaddr_in& forwardTo, uint32_t frameLimit = UINT_MAX, in_addr originalSourceAddr={});
 
-  std::mutex mutex;
+  std::recursive_mutex mutex;
   std::map<u_short, std::queue<ReceivedPacket>> receivedPacketsByPort;
   in_addr servservAddr = {};
 
@@ -246,9 +246,10 @@ int Proxy::send_override(SOCKET s, const char* buf, int len, int flags)
   if (type != SOCK_DGRAM)
     return send_orig(s, buf, len, flags);
 
+  std::scoped_lock lock(this->mutex);
+
   sockaddr_in destination;
   {
-    std::scoped_lock lock(this->mutex);
     SocketData* socketData = this->tryGetSocketData(s);
     release_assert(socketData);
     destination = *socketData->connectAddr;
@@ -267,9 +268,10 @@ int Proxy::recv_override(SOCKET s, char* buf, int len, int flags)
   if (type != SOCK_DGRAM)
     return recv_orig(s, buf, len, flags);
 
+  std::scoped_lock lock(this->mutex);
+
   sockaddr_in connectAddr;
   {
-    std::scoped_lock lock(this->mutex);
     SocketData* socketData = this->tryGetSocketData(s);
     release_assert(socketData);
     connectAddr = *socketData->connectAddr;
@@ -414,6 +416,8 @@ void ProxyServer::run()
     int fromlen = sizeof(sockaddr);
     int bytesRead = recvfrom_orig(this->sock, (char*)&buff[0], buffSize, 0, &from, &fromlen);
 
+    std::scoped_lock lock(this->mutex);
+
     if (bytesRead < int(sizeof(ForwardedPacketHeader)))
       continue;
 
@@ -464,8 +468,6 @@ void ProxyServer::run()
 
       uint8_t* originalData = buff + sizeof(ForwardedPacketHeader);
       int originalDataSize = bytesRead - sizeof(ForwardedPacketHeader);
-      std::scoped_lock lock(this->mutex);
-
 
       // packet is for this server
       if (header->originalTo.sin_addr.S_un.S_addr == this->servservAddr.S_un.S_addr)
@@ -529,12 +531,15 @@ void ProxyServer::sendKeepaliveLoop()
 {
   while (true)
   {
-    for (int32_t i = 0; i < int32_t(this->clients.size()); i++)
     {
-      ForwardedPacketHeader keepalivePacket = {};
-      keepalivePacket.type = PacketType::KeepAlive;
-      keepalivePacket.crc = CRC::Calculate(&keepalivePacket + 4, sizeof(ForwardedPacketHeader) - 4, CRC::CRC_32());
-      sendto_orig(this->sock, (const char*)&keepalivePacket, sizeof(ForwardedPacketHeader), 0, (sockaddr*)&this->clients[i].realReplyAddr, sizeof(this->clients[i].realReplyAddr));
+      std::scoped_lock lock(this->mutex);
+      for (int32_t i = 0; i < int32_t(this->clients.size()); i++)
+      {
+        ForwardedPacketHeader keepalivePacket = {};
+        keepalivePacket.type = PacketType::KeepAlive;
+        keepalivePacket.crc = CRC::Calculate(&keepalivePacket + 4, sizeof(ForwardedPacketHeader) - 4, CRC::CRC_32());
+        sendto_orig(this->sock, (const char*)&keepalivePacket, sizeof(ForwardedPacketHeader), 0, (sockaddr*)&this->clients[i].realReplyAddr, sizeof(this->clients[i].realReplyAddr));
+      }
     }
 
     Sleep(1000 * 10);
@@ -543,6 +548,8 @@ void ProxyServer::sendKeepaliveLoop()
 
 int ProxyServer::sendto_override(SOCKET s, const char* buf, int len, int flags, const struct sockaddr* to, int tolen)
 {
+  std::scoped_lock lock(this->mutex);
+
   sockaddr_in* to4 = (sockaddr_in*)to;
   uint16_t toPortH = ntohs(to4->sin_port);
 
