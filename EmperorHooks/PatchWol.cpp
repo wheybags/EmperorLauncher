@@ -14,11 +14,10 @@
 #include "GameExeImports.hpp"
 #include <combaseapi.h>
 #include "WolServer.hpp"
+#include "WolPort.hpp"
 
 //#define proxylog(format, ...) Log("\033[32m" format "\033[0m", __VA_ARGS__)
 #define proxylog(format, ...) do {} while(0)
-
-constexpr u_short proxyPortH = 1337;
 
 struct PortRange
 {
@@ -389,7 +388,7 @@ void ProxyServer::initialise()
   sockaddr_in bindAddress = {};
   bindAddress.sin_family = AF_INET;
   bindAddress.sin_addr.S_un.S_addr = INADDR_ANY;
-  bindAddress.sin_port = htons(proxyPortH);
+  bindAddress.sin_port = htons(wolPortH);
 
   release_assert(bind(this->sock, (sockaddr*)&bindAddress, sizeof(sockaddr_in)) == 0);
 
@@ -622,7 +621,7 @@ void ProxyClient::initialise()
   this->sock = socket(AF_INET, SOCK_DGRAM, 0);
   release_assert(sock != INVALID_SOCKET);
   this->serverAddr.sin_family = AF_INET;
-  this->serverAddr.sin_port = htons(proxyPortH);
+  this->serverAddr.sin_port = htons(wolPortH);
   this->serverAddr.sin_addr.S_un.S_addr = inet_addr(this->serverAddrString.c_str());
 
   this->servservAddr = this->serverAddr.sin_addr;

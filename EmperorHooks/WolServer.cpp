@@ -5,6 +5,7 @@
 #include "Misc.hpp"
 #include <optional>
 #include "Log.hpp"
+#include "WolPort.hpp"
 
 
 
@@ -21,7 +22,7 @@ void WolServer::run()
 {
   sockaddr_in serverAddr;
   serverAddr.sin_family = AF_INET;
-  serverAddr.sin_port = htons(4005);
+  serverAddr.sin_port = htons(wolPortH);
   serverAddr.sin_addr.S_un.S_addr = INADDR_ANY;
 
   SOCKET listenSocket = socket(AF_INET, SOCK_STREAM, 0);
@@ -310,9 +311,10 @@ void WolServer::Connection::handle_whereto(const std::vector<std::string>& line)
   // <<: 608 u :xwis.net 4900 'Gameres server' -8 36.1083 -115.0582
 
   // reply with servserv.westwood.com, because we already have dns set up in the client to redirect it at this server.
-  // Using port 4005 instead of 4000 like the original because it's more convenient to bundle servserv and irc on the same port
-  // xwis says it has a gameres server on port 4900, but attempts to connect to that port fail, so ¯\_(ツ)_/¯
-  std::string response = ": 605 u :servserv.westwood.com 4005 '0:Emperor' -8 36.1083 -115.0582\r\n"
+  // Using the same port for servser and "chat" because it's more convenient to bundle servserv them both together.
+  // xwis says it has a gameres server on port 4900, but attempts to connect to that port fail, so ¯\_(ツ)_/¯.
+  // Client should be patched to never attempt connection anyway
+  std::string response = ": 605 u :servserv.westwood.com " + std::to_string(wolPortH) + " '0:Emperor' - 8 36.1083 - 115.0582\r\n"
                          ": 608 u :servserv.westwood.com 4900 'Gameres server' -8 36.1083 -115.0582\r\n";
 
 

@@ -17,13 +17,8 @@ private:
   {
   public:
     Connection(WolServer& server, SOCKET socket, sockaddr_in clientAddr)
-      : server(server), socket(socket), clientAddr(clientAddr), gameId(server.nextGameId++) {
-
-      std::string aaa = this->getIpIntString();
-
-      return;
-
-    }
+      : server(server), socket(socket), clientAddr(clientAddr), gameId(server.nextGameId++)
+    {}
 
     std::string getIpIntString() const;
     std::string getIpString() const;

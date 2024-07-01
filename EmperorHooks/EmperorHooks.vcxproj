@@ -117,6 +117,7 @@ nmake</Command>
     <ClInclude Include="PatchDebugLog.hpp" />
     <ClInclude Include="PatchRegistry.hpp" />
     <ClInclude Include="PatchWindowManagement.hpp" />
+    <ClInclude Include="WolPort.hpp" />
     <ClInclude Include="WolServer.hpp" />
     <ClInclude Include="WrapWinsock.hpp" />
   </ItemGroup>
