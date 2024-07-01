@@ -371,6 +371,7 @@ private:
   struct ClientData
   {
     sockaddr_in realReplyAddr;
+    uint64_t lastReceiveTime = 0;
 
     uint16_t virtualPortRangeStartH = 0;
     uint16_t virtualPortRangeEndH = 0;
@@ -456,6 +457,8 @@ void ProxyServer::run()
       fromClient->realReplyAddr = from4;
     }
 
+    fromClient->lastReceiveTime = GetTickCount64();
+
 
     if (header->type == PacketType::GamePacket)
     {
@@ -533,12 +536,22 @@ void ProxyServer::sendKeepaliveLoop()
   {
     {
       std::scoped_lock lock(this->mutex);
-      for (int32_t i = 0; i < int32_t(this->clients.size()); i++)
+      for (int32_t i = 0; i < int32_t(this->clients.size()); )
       {
-        ForwardedPacketHeader keepalivePacket = {};
-        keepalivePacket.type = PacketType::KeepAlive;
-        keepalivePacket.crc = CRC::Calculate(&keepalivePacket + 4, sizeof(ForwardedPacketHeader) - 4, CRC::CRC_32());
-        sendto_orig(this->sock, (const char*)&keepalivePacket, sizeof(ForwardedPacketHeader), 0, (sockaddr*)&this->clients[i].realReplyAddr, sizeof(this->clients[i].realReplyAddr));
+        if (GetTickCount64() - this->clients[i].lastReceiveTime > 1000 * 60)
+        {
+          Log("client %s:%d timed out\n", inet_ntoa(this->clients[i].realReplyAddr.sin_addr), ntohs(this->clients[i].realReplyAddr.sin_port));
+          this->clients.erase(this->clients.begin() + i);
+        }
+        else
+        {
+          ForwardedPacketHeader keepalivePacket = {};
+          keepalivePacket.type = PacketType::KeepAlive;
+          keepalivePacket.crc = CRC::Calculate(((uint8_t*)&keepalivePacket) + 4, sizeof(ForwardedPacketHeader) - 4, CRC::CRC_32());
+          sendto_orig(this->sock, (const char*)&keepalivePacket, sizeof(ForwardedPacketHeader), 0, (sockaddr*)&this->clients[i].realReplyAddr, sizeof(this->clients[i].realReplyAddr));
+
+          i++;
+        }
       }
     }
 
