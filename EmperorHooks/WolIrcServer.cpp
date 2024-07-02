@@ -412,7 +412,7 @@ void WolIrcServer::Connection::handle_JOINGAME(const std::vector<std::string>& l
     // asserting that the parameters are what I expect, then hardcoding the responses
     wolcommand_assert(line[1] == "#" + this->nick);
     wolcommand_assert(line[2] == "1");
-    wolcommand_assert(line[3] == "2");
+    //wolcommand_assert(line[3] == "2"); // maxplayers, allow this to be whatever, we don't enforce it
     wolcommand_assert(line[4] == "31");
     wolcommand_assert(line[5] == "3");
     wolcommand_assert(line[6] == "1");
