@@ -87,10 +87,12 @@
     <ClCompile Include="EmperorLauncher.cpp" />
     <ClCompile Include="Installer.cpp" />
     <ClCompile Include="md5.c" />
+    <ClCompile Include="NetworkTest.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Installer.hpp" />
     <ClInclude Include="md5.h" />
+    <ClInclude Include="NetworkTest.hpp" />
     <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>

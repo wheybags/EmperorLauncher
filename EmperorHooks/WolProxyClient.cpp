@@ -2,7 +2,7 @@
 #include "WolProxyClient.hpp"
 #include "Error.hpp"
 #include "CRC.hpp"
-#include "WolPort.hpp"
+#include "WolCommon.hpp"
 
 
 void WolProxyClient::initialise()

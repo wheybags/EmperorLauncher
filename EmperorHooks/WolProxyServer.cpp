@@ -1,6 +1,6 @@
 #include "WolProxyServer.hpp"
 #include "Error.hpp"
-#include "WolPort.hpp"
+#include "WolCommon.hpp"
 #include "WolIrcServer.hpp"
 #include "CRC.hpp"
 #include "GameExeImports.hpp"
@@ -86,8 +86,11 @@ void WolProxyServer::run()
 
     fromClient->lastReceiveTime = GetTickCount64();
 
-
-    if (header->type == PacketType::GamePacket)
+    if (header->type == PacketType::ConnectionTest)
+    {
+      sendto_orig(this->sock, (const char*)buff, bytesRead, 0, (sockaddr*)&from4, sizeof(sockaddr_in));
+    }
+    else if (header->type == PacketType::GamePacket)
     {
       if (fromClient->virtualPortRangeStartH != header->portRangeStartH || fromClient->virtualPortRangeEndH != header->portRangeEndH)
       {
@@ -218,5 +221,5 @@ int WolProxyServer::sendto_override(SOCKET s, const char* buf, int len, int flag
   int size = sizeof(sockaddr_in);
   getsockname(s, (sockaddr*)&sourceSockName, &size);
 
-  return this->forwardSend(ntohs(sourceSockName.sin_port), buf, len, flags, to, tolen, this->sock, client->realReplyAddr, frameLimit, this->servservAddr);
+  return WolProxyBase::forwardSend(ntohs(sourceSockName.sin_port), buf, len, flags, to, tolen, this->sock, client->realReplyAddr, frameLimit, this->servservAddr);
 }

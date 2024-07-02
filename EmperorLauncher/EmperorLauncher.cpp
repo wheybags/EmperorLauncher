@@ -11,6 +11,7 @@
 #include "Installer.hpp"
 #include <filesystem>
 #include "md5.h"
+#include "NetworkTest.hpp"
 
 
 HANDLE globalCommsFileMappingHandle = nullptr;
@@ -192,9 +193,12 @@ HWND window = nullptr;
 
 HWND fullscreenCheckbox = nullptr;
 HWND hostGameRadio = nullptr;
+HWND portsLabel = nullptr;
 HWND connectToServerRadio = nullptr;
 HWND serverAddressTextbox = nullptr;
+
 HWND playButton = nullptr;
+HWND testNetworkButton = nullptr;
 
 HWND pauseOnStartupCheckbox = nullptr;
 HWND forceCursorVisibleCheckbox = nullptr;
@@ -205,13 +209,11 @@ bool playClicked = false;
 Settings settings;
 
 
-void refreshServerAddressTextboxEnabled()
+void refreshDerivedState()
 {
   bool checked = SendMessage(connectToServerRadio, BM_GETCHECK, 0, 0) == BST_CHECKED;
-  if (checked)
-    EnableWindow(serverAddressTextbox, true);
-  else
-    EnableWindow(serverAddressTextbox, false);
+  EnableWindow(serverAddressTextbox, checked);
+  EnableWindow(testNetworkButton, checked);
 }
 
 
@@ -227,7 +229,7 @@ void loadAndApplySettings()
   SendMessageA(forceCursorVisibleCheckbox, BM_SETCHECK, settings.forceCursorVisible ? BST_CHECKED : BST_UNCHECKED, 0);
   SendMessageA(disableCursorCaptureCheckbox, BM_SETCHECK, settings.disableCursorCapture ? BST_CHECKED : BST_UNCHECKED, 0);
 
-  refreshServerAddressTextboxEnabled();
+  refreshDerivedState();
 }
 
 
@@ -235,7 +237,7 @@ LRESULT onServerOrClientRadioClicked(HWND hwnd, UINT message, WPARAM wParam, LPA
   settings.hostGame = SendMessage(hostGameRadio, BM_GETCHECK, 0, 0) == BST_CHECKED;
   settings.writeSettings();
 
-  refreshServerAddressTextboxEnabled();
+  refreshDerivedState();
   return CallWindowProc(defWndProc, hwnd, message, wParam, lParam);
 }
 
@@ -299,6 +301,12 @@ LRESULT OnPlayClicked(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
   return CallWindowProc(defWndProc, hwnd, message, wParam, lParam);
 }
 
+LRESULT OnTestNetworkClicked(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+  testNetwork(window, settings.serverAddress);
+  return CallWindowProc(defWndProc, hwnd, message, wParam, lParam);
+}
+
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
   if (message == WM_CLOSE && hwnd == window) return OnWindowClose(hwnd, message, wParam, lParam);
@@ -311,6 +319,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) 
   if (message == WM_COMMAND && HIWORD(wParam) == BN_CLICKED && reinterpret_cast<HWND>(lParam) == pauseOnStartupCheckbox) return onPauseOnStartupCheckboxClicked(hwnd, message, wParam, lParam);
   if (message == WM_COMMAND && HIWORD(wParam) == BN_CLICKED && reinterpret_cast<HWND>(lParam) == forceCursorVisibleCheckbox) return onForceCursorVisibleCheckboxClicked(hwnd, message, wParam, lParam);
   if (message == WM_COMMAND && HIWORD(wParam) == BN_CLICKED && reinterpret_cast<HWND>(lParam) == disableCursorCaptureCheckbox) return onDisableCursorCaptureCheckboxClicked(hwnd, message, wParam, lParam);
+  if (message == WM_COMMAND && HIWORD(wParam) == BN_CLICKED && reinterpret_cast<HWND>(lParam) == testNetworkButton) return OnTestNetworkClicked(hwnd, message, wParam, lParam);
 
   return CallWindowProc(defWndProc, hwnd, message, wParam, lParam);
 }
@@ -393,7 +402,7 @@ int wmain(int argc, wchar_t* argv[])
 
   // main window
   int width = 550;
-  int height = 350;
+  int height = 400;
   int left = GetSystemMetrics(SM_CXSCREEN) / 2 - width / 2;
   int top = GetSystemMetrics(SM_CYSCREEN) / 2 - height / 2;
   window = CreateWindowEx(0, WC_DIALOG, L"EmperorLauncher", WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU, left, top, width, height, nullptr, nullptr, nullptr, nullptr);
@@ -415,11 +424,19 @@ int wmain(int argc, wchar_t* argv[])
 
     hostGameRadio = CreateWindowEx(0, WC_BUTTON, L"Host game / singleplayer", WS_VISIBLE | WS_CHILD | BS_AUTORADIOBUTTON, x, y, 200, 24, window, nullptr, nullptr, nullptr);
     y += ySpace;
+
+    portsLabel = CreateWindowEx(0, WC_STATIC, L"Host must open port 4005 UDP and TCP", WS_CHILD | WS_VISIBLE, x + 20, y, 300, 24, window, nullptr, nullptr, nullptr);
+    y += ySpace;
+
     connectToServerRadio = CreateWindowEx(0, WC_BUTTON, L"Connect to server", WS_VISIBLE | WS_CHILD | BS_AUTORADIOBUTTON | WS_GROUP, x, y, 200, 24, window, nullptr, nullptr, nullptr);
     y += ySpace;
 
-    serverAddressTextbox = CreateWindowEx(WS_EX_CLIENTEDGE, WC_EDIT, L"server ip here", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, x, y, 200, 24, window, nullptr, nullptr, nullptr);
+    serverAddressTextbox = CreateWindowEx(WS_EX_CLIENTEDGE, WC_EDIT, L"server ip here", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, x + 20, y, 200, 24, window, nullptr, nullptr, nullptr);
     y += ySpace;
+
+    testNetworkButton = CreateWindowEx(0, WC_BUTTON, L"Test connection", WS_CHILD | WS_VISIBLE, x + 20, y, 124, 24, window, nullptr, nullptr, nullptr);
+    y += ySpace;
+
 
     yMax = std::max(yMax, y + ySpace);
   }
@@ -427,7 +444,7 @@ int wmain(int argc, wchar_t* argv[])
   // right side
   {
     int y = ySpace;
-    int x = 320;
+    int x = 330;
 
     CreateWindowEx(0, WC_STATIC, L"Debug settings", WS_CHILD | WS_VISIBLE, x, y, 200, 24, window, nullptr, nullptr, nullptr);
     y += ySpace;

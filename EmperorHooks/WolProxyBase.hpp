@@ -5,6 +5,7 @@
 #include <optional>
 #include <queue>
 #include "WinsockApi.hpp"
+#include "WolCommon.hpp"
 
 //#define proxylog(format, ...) Log("\033[32m" format "\033[0m", __VA_ARGS__)
 #define proxylog(format, ...) do {} while(0)
@@ -31,30 +32,6 @@ struct SocketData
 
   void sendReadEvent();
   void sendWriteEvent();
-};
-
-struct PortRange
-{
-  u_short startH;
-  u_short endH;
-};
-
-enum class PacketType : uint8_t
-{
-  GamePacket,
-  KeepAlive,
-};
-
-struct ForwardedPacketHeader
-{
-  uint32_t crc;
-  sockaddr_in originalTo;
-  u_short originalSourcePortH;
-  in_addr originalSourceAddr; // only used for host->client packets
-  uint32_t gameSpeed; // only used for host->client packets
-  PacketType type;
-  uint16_t portRangeStartH = 0;
-  uint16_t portRangeEndH = 0;
 };
 
 

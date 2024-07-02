@@ -59,7 +59,7 @@
     <ClInclude Include="Settings.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="WolPort.hpp">
+    <ClInclude Include="WolCommon.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="WolProxyBase.hpp">

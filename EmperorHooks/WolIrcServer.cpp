@@ -5,7 +5,7 @@
 #include "Misc.hpp"
 #include <optional>
 #include "Log.hpp"
-#include "WolPort.hpp"
+#include "WolCommon.hpp"
 
 
 
