@@ -119,6 +119,9 @@ nmake</Command>
     <ClInclude Include="PatchWindowManagement.hpp" />
     <ClInclude Include="WolPort.hpp" />
     <ClInclude Include="WolIrcServer.hpp" />
+    <ClInclude Include="WolProxyBase.hpp" />
+    <ClInclude Include="WolProxyClient.hpp" />
+    <ClInclude Include="WolProxyServer.hpp" />
     <ClInclude Include="WrapWinsock.hpp" />
   </ItemGroup>
   <ItemGroup>
@@ -134,6 +137,9 @@ nmake</Command>
     <ClCompile Include="PatchRegistry.cpp" />
     <ClCompile Include="PatchWindowManagement.cpp" />
     <ClCompile Include="WolIrcServer.cpp" />
+    <ClCompile Include="WolProxyBase.cpp" />
+    <ClCompile Include="WolProxyClient.cpp" />
+    <ClCompile Include="WolProxyServer.cpp" />
     <ClCompile Include="WrapWinsock.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
