@@ -132,13 +132,13 @@
   <ItemGroup>
     <ClCompile Include="..\EmperorHooks\Log.cpp" />
     <ClCompile Include="..\EmperorHooks\Misc.cpp" />
-    <ClCompile Include="..\EmperorHooks\WolServer.cpp" />
+    <ClCompile Include="..\EmperorHooks\WolIrcServer.cpp" />
     <ClCompile Include="WolServerStandaloneMain.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\EmperorHooks\Log.hpp" />
     <ClInclude Include="..\EmperorHooks\Misc.hpp" />
-    <ClInclude Include="..\EmperorHooks\WolServer.hpp" />
+    <ClInclude Include="..\EmperorHooks\WolIrcServer.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

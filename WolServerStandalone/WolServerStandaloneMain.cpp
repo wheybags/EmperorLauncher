@@ -1,4 +1,4 @@
-#include "../EmperorHooks/WolServer.hpp"
+#include "../EmperorHooks/WolIrcServer.hpp"
 #pragma comment (lib, "Ws2_32.lib")
 
 
@@ -8,7 +8,7 @@ int main(void)
   WSAStartup(MAKEWORD(1, 1), &wsaData);
 
 
-  WolServer server;
+  WolIrcServer server;
   server.run();
   return 0;
 }

@@ -11,9 +11,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\EmperorHooks\WolServer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="WolServerStandaloneMain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -23,15 +20,18 @@
     <ClCompile Include="..\EmperorHooks\Log.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\EmperorHooks\WolIrcServer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\EmperorHooks\WolServer.hpp">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\EmperorHooks\Misc.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="..\EmperorHooks\Log.hpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\EmperorHooks\WolIrcServer.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

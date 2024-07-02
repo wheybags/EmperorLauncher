@@ -50,7 +50,7 @@
     <ClInclude Include="PatchWindowManagement.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="WolServer.hpp">
+    <ClInclude Include="WolIrcServer.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="Misc.hpp">
@@ -97,7 +97,7 @@
     <ClCompile Include="PatchWol.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="WolServer.cpp">
+    <ClCompile Include="WolIrcServer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Misc.cpp">

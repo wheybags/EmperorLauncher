@@ -13,7 +13,7 @@
 #include <optional>
 #include "GameExeImports.hpp"
 #include <combaseapi.h>
-#include "WolServer.hpp"
+#include "WolIrcServer.hpp"
 #include "WolPort.hpp"
 
 //#define proxylog(format, ...) Log("\033[32m" format "\033[0m", __VA_ARGS__)
@@ -395,7 +395,7 @@ void ProxyServer::initialise()
   this->servservAddr.S_un.S_addr = inet_addr("127.0.0.1");
 
   std::thread([]() {
-    WolServer wolServer;
+    WolIrcServer wolServer;
     wolServer.run();
   }).detach();
 }

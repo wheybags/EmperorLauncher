@@ -118,7 +118,7 @@ nmake</Command>
     <ClInclude Include="PatchRegistry.hpp" />
     <ClInclude Include="PatchWindowManagement.hpp" />
     <ClInclude Include="WolPort.hpp" />
-    <ClInclude Include="WolServer.hpp" />
+    <ClInclude Include="WolIrcServer.hpp" />
     <ClInclude Include="WrapWinsock.hpp" />
   </ItemGroup>
   <ItemGroup>
@@ -133,7 +133,7 @@ nmake</Command>
     <ClCompile Include="PatchDebugLog.cpp" />
     <ClCompile Include="PatchRegistry.cpp" />
     <ClCompile Include="PatchWindowManagement.cpp" />
-    <ClCompile Include="WolServer.cpp" />
+    <ClCompile Include="WolIrcServer.cpp" />
     <ClCompile Include="WrapWinsock.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

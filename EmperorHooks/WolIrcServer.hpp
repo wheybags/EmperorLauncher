@@ -6,7 +6,7 @@
 #include <memory>
 #include <mutex>
 
-class WolServer
+class WolIrcServer
 {
 public:
   void run();
@@ -16,7 +16,7 @@ private:
   class Connection
   {
   public:
-    Connection(WolServer& server, SOCKET socket, sockaddr_in clientAddr)
+    Connection(WolIrcServer& server, SOCKET socket, sockaddr_in clientAddr)
       : server(server), socket(socket), clientAddr(clientAddr), gameId(server.nextGameId++)
     {}
 
@@ -65,7 +65,7 @@ private:
 
     Connection* connectedToChannel = nullptr;
 
-    WolServer& server;
+    WolIrcServer& server;
     SOCKET socket = INVALID_SOCKET;
     bool connected = true;
     sockaddr_in clientAddr = {};

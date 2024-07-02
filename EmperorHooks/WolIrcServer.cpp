@@ -1,4 +1,4 @@
-﻿#include "WolServer.hpp"
+﻿#include "WolIrcServer.hpp"
 #include <thread>
 #include <vector>
 #include "Error.hpp"
@@ -18,7 +18,7 @@
 
 
 
-void WolServer::run()
+void WolIrcServer::run()
 {
   sockaddr_in serverAddr;
   serverAddr.sin_family = AF_INET;
@@ -74,7 +74,7 @@ static std::vector<std::string> splitWhitespace(const std::string_view str)
   return result;
 }
 
-void WolServer::clientLoop(Connection& connection)
+void WolIrcServer::clientLoop(Connection& connection)
 {
   std::vector<char> buffer;
   buffer.resize(1024 * 1024 * 10);
@@ -248,12 +248,12 @@ void WolServer::clientLoop(Connection& connection)
   }
 }
 
-std::string WolServer::Connection::getIpIntString() const
+std::string WolIrcServer::Connection::getIpIntString() const
 {
   return std::to_string(ntohl(this->clientAddr.sin_addr.S_un.S_addr));
 }
 
-std::string WolServer::Connection::getIpString() const
+std::string WolIrcServer::Connection::getIpString() const
 {
   return inet_ntoa(this->clientAddr.sin_addr);
 }
@@ -268,7 +268,7 @@ std::string WolServer::Connection::getIpString() const
 //#define wolcommand_assert(X) if (!(X)) do { Log("wolcommand_assert failed: %s, %s:%d", #X, __FILE__, __LINE__); return; } while (0)
 
 
-void WolServer::Connection::handle_verchk(const std::vector<std::string>& line)
+void WolIrcServer::Connection::handle_verchk(const std::vector<std::string>& line)
 {
   // example session (on servserv):
   // >>verchk 32512 65551
@@ -282,7 +282,7 @@ void WolServer::Connection::handle_verchk(const std::vector<std::string>& line)
   // I just ignore this for both servers. Pretty sure westwood isn't about to release a new version
 }
 
-void WolServer::Connection::handle_lobcount(const std::vector<std::string>& line)
+void WolIrcServer::Connection::handle_lobcount(const std::vector<std::string>& line)
 {
   // example session:
   // >>lobcount 7936
@@ -292,7 +292,7 @@ void WolServer::Connection::handle_lobcount(const std::vector<std::string>& line
   send(socket, response.data(), int(response.size()), 0);
 }
 
-void WolServer::Connection::handle_QUIT(const std::vector<std::string>& line)
+void WolIrcServer::Connection::handle_QUIT(const std::vector<std::string>& line)
 {
   // example session:
   // >>QUIT
@@ -303,7 +303,7 @@ void WolServer::Connection::handle_QUIT(const std::vector<std::string>& line)
   this->connected = false;
 }
 
-void WolServer::Connection::handle_whereto(const std::vector<std::string>& line)
+void WolIrcServer::Connection::handle_whereto(const std::vector<std::string>& line)
 {
   // example session:
   // >>whereto tibsun tibpass99 7936 1
@@ -321,7 +321,7 @@ void WolServer::Connection::handle_whereto(const std::vector<std::string>& line)
   send(socket, response.data(), int(response.size()), 0);
 }
 
-void WolServer::Connection::handle_CVERS(const std::vector<std::string>& line)
+void WolIrcServer::Connection::handle_CVERS(const std::vector<std::string>& line)
 {
   // example session:
   // >>CVERS 11015 7936
@@ -348,25 +348,25 @@ void WolServer::Connection::handle_CVERS(const std::vector<std::string>& line)
 // I don't care about user management or serials, so I'll just ignore it and accept whatever NICK the client requested.
 // TODO: maybe I should complain about duplicate nicks?
 
-void WolServer::Connection::handle_PASS(const std::vector<std::string>& line)
+void WolIrcServer::Connection::handle_PASS(const std::vector<std::string>& line)
 {
 }
 
-void WolServer::Connection::handle_NICK(const std::vector<std::string>& line)
+void WolIrcServer::Connection::handle_NICK(const std::vector<std::string>& line)
 {
   wolcommand_assert(line.size() == 2);
   this->nick = line[1];
 }
 
-void WolServer::Connection::handle_apgar(const std::vector<std::string>& line)
+void WolIrcServer::Connection::handle_apgar(const std::vector<std::string>& line)
 {
 }
 
-void WolServer::Connection::handle_SERIAL(const std::vector<std::string>& line)
+void WolIrcServer::Connection::handle_SERIAL(const std::vector<std::string>& line)
 {
 }
 
-void WolServer::Connection::handle_USER(const std::vector<std::string>& line)
+void WolIrcServer::Connection::handle_USER(const std::vector<std::string>& line)
 {
   std::string_view response = ": 375 u :- blah blah motd\r\n"
                               ": 372 u :-\r\n"
@@ -374,7 +374,7 @@ void WolServer::Connection::handle_USER(const std::vector<std::string>& line)
   send(socket, response.data(), int(response.size()), 0);
 }
 
-void WolServer::Connection::handle_SETOPT(const std::vector<std::string>& line)
+void WolIrcServer::Connection::handle_SETOPT(const std::vector<std::string>& line)
 {
   // example session:
   // >>SETOPT 17,33
@@ -383,7 +383,7 @@ void WolServer::Connection::handle_SETOPT(const std::vector<std::string>& line)
   // This is used to set some options that I don't care about. I'll just ignore it.
 }
 
-void WolServer::Connection::handle_JOINGAME(const std::vector<std::string>& line)
+void WolIrcServer::Connection::handle_JOINGAME(const std::vector<std::string>& line)
 {
   Connection* hostConnection = nullptr;
 
@@ -497,7 +497,7 @@ void WolServer::Connection::handle_JOINGAME(const std::vector<std::string>& line
   }
 }
 
-void WolServer::Connection::handle_LIST(const std::vector<std::string>& line)
+void WolIrcServer::Connection::handle_LIST(const std::vector<std::string>& line)
 {
   // example session:
   // >>LIST -1 31                                                             // -1 indicates "include quick match rooms", we don't implement those. 31 is the game ID for Emperor
@@ -538,7 +538,7 @@ void WolServer::Connection::handle_LIST(const std::vector<std::string>& line)
   send(socket, response.data(), int(response.size()), 0);
 }
 
-void WolServer::Connection::handle_SETCODEPAGE(const std::vector<std::string>& line)
+void WolIrcServer::Connection::handle_SETCODEPAGE(const std::vector<std::string>& line)
 {
   // example session:
   // >>SETCODEPAGE 1252
@@ -552,7 +552,7 @@ void WolServer::Connection::handle_SETCODEPAGE(const std::vector<std::string>& l
   send(socket, response.data(), int(response.size()), 0);
 }
 
-void WolServer::Connection::handle_GETCODEPAGE(const std::vector<std::string>& line)
+void WolIrcServer::Connection::handle_GETCODEPAGE(const std::vector<std::string>& line)
 {
   // example session:
   // >>GETCODEPAGE wheybags
@@ -588,7 +588,7 @@ void WolServer::Connection::handle_GETCODEPAGE(const std::vector<std::string>& l
   send(socket, response.data(), int(response.size()), 0);
 }
 
-void WolServer::Connection::handle_SETLOCALE(const std::vector<std::string>& line)
+void WolIrcServer::Connection::handle_SETLOCALE(const std::vector<std::string>& line)
 {
   // example session:
   // >>SETLOCALE 0
@@ -602,7 +602,7 @@ void WolServer::Connection::handle_SETLOCALE(const std::vector<std::string>& lin
   send(socket, response.data(), int(response.size()), 0);
 }
 
-void WolServer::Connection::handle_GETLOCALE(const std::vector<std::string>& line)
+void WolIrcServer::Connection::handle_GETLOCALE(const std::vector<std::string>& line)
 {
   // >>GETLOCALE wheybags
   // <<: 309 u wheybags`0
@@ -613,7 +613,7 @@ void WolServer::Connection::handle_GETLOCALE(const std::vector<std::string>& lin
   send(socket, response.data(), int(response.size()), 0);
 }
 
-void WolServer::Connection::handle_SQUADINFO(const std::vector<std::string>& line)
+void WolIrcServer::Connection::handle_SQUADINFO(const std::vector<std::string>& line)
 {
   // example session:
   // >>SQUADINFO 0        // get clan info, 0 means "my clan"
@@ -623,7 +623,7 @@ void WolServer::Connection::handle_SQUADINFO(const std::vector<std::string>& lin
   send(socket, response.data(), int(response.size()), 0);
 }
 
-void WolServer::Connection::handle_GETINSIDER(const std::vector<std::string>& line)
+void WolIrcServer::Connection::handle_GETINSIDER(const std::vector<std::string>& line)
 {
   // example session:
   // >>GETINSIDER wheybags
@@ -635,7 +635,7 @@ void WolServer::Connection::handle_GETINSIDER(const std::vector<std::string>& li
   send(socket, response.data(), int(response.size()), 0);
 }
 
-void WolServer::Connection::handle_TIME(const std::vector<std::string>& line)
+void WolIrcServer::Connection::handle_TIME(const std::vector<std::string>& line)
 {
   // example session:
   // >>TIME
@@ -647,7 +647,7 @@ void WolServer::Connection::handle_TIME(const std::vector<std::string>& line)
   send(socket, response.data(), int(response.size()), 0);
 }
 
-void WolServer::Connection::handle_GETBUDDY(const std::vector<std::string>& line)
+void WolIrcServer::Connection::handle_GETBUDDY(const std::vector<std::string>& line)
 {
   // example session:
   // >>GETBUDDY
@@ -659,7 +659,7 @@ void WolServer::Connection::handle_GETBUDDY(const std::vector<std::string>& line
   send(socket, response.data(), int(response.size()), 0);
 }
 
-void WolServer::Connection::handle_TOPIC(const std::vector<std::string>& line, const std::string& lineStr)
+void WolIrcServer::Connection::handle_TOPIC(const std::vector<std::string>& line, const std::string& lineStr)
 {
   // example session:
   // >>TOPIC #wheybags :g1\x932\x03\x01wheybags       // one trailing space at the end of this line
@@ -679,7 +679,7 @@ void WolServer::Connection::handle_TOPIC(const std::vector<std::string>& line, c
   this->hostChannelTopic.erase(0, 1);
 }
 
-void WolServer::Connection::handle_GAMEOPT(const std::vector<std::string>& line, const std::string& lineStr)
+void WolIrcServer::Connection::handle_GAMEOPT(const std::vector<std::string>& line, const std::string& lineStr)
 {
   // example session:
   // >>GAMEOPT #wheybags **a pile of binary**
@@ -716,7 +716,7 @@ void WolServer::Connection::handle_GAMEOPT(const std::vector<std::string>& line,
   }
 }
 
-void WolServer::Connection::handle_STARTG(const std::vector<std::string>& line)
+void WolIrcServer::Connection::handle_STARTG(const std::vector<std::string>& line)
 {
   // example session:
   // >>STARTG #wheybags wheybags, wheybags2
@@ -735,7 +735,7 @@ void WolServer::Connection::handle_STARTG(const std::vector<std::string>& line)
     send(this->hostChannelMembers[i]->socket, response.data(), int(response.size()), 0);
 }
 
-void WolServer::Connection::handle_PART(const std::vector<std::string>& line)
+void WolIrcServer::Connection::handle_PART(const std::vector<std::string>& line)
 {
   // example session:
   // >>PART #wheybags
@@ -778,7 +778,7 @@ void WolServer::Connection::handle_PART(const std::vector<std::string>& line)
   }
 }
 
-void WolServer::Connection::handle_PRIVMSG(const std::vector<std::string>& line, const std::string& lineStr)
+void WolIrcServer::Connection::handle_PRIVMSG(const std::vector<std::string>& line, const std::string& lineStr)
 {
   // example session:
   // >>PRIVMSG #wheybags :asasdasd
