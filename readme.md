@@ -7,4 +7,5 @@ Download v1.0 [here](https://github.com/wheybags/EmperorLauncher/releases/downlo
 There is a a blog post explaining the technical details [here](https://wheybags.com/blog/emperor.html)
 
 [Youtube video of me and a friend playing Coop Campaign in 4k](http://www.youtube.com/watch?v=b-xWWKqjg54)
+
 [![](http://img.youtube.com/vi/b-xWWKqjg54/0.jpg)](http://www.youtube.com/watch?v=b-xWWKqjg54)
