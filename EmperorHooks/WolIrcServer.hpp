@@ -52,6 +52,8 @@ private:
     void handle_STARTG(const std::vector<std::string>& line);
     void handle_PART(const std::vector<std::string>& line);
     void handle_PRIVMSG(const std::vector<std::string>& line, const std::string& lineStr);
+    void handle_KICK(const std::vector<std::string>& line);
+    void handle_PAGE(const std::vector<std::string>& line, const std::string& lineStr);
 
   public:
     std::string nick;
